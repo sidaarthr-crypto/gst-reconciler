@@ -25,11 +25,11 @@ const items = [
 
 export function Features() {
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <section className="mx-auto max-w-6xl px-4 py-16 md:px-6">
       <h2 className="text-center text-3xl font-bold text-brand-navy">
         Built for how CAs actually work
       </h2>
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
+      <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {items.map((f) => (
           <Card key={f.title} className="border-border shadow-sm">
             <CardContent className="p-6">

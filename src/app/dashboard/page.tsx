@@ -139,7 +139,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-[#F8FAFC] pb-16 pt-8">
-      <div className="mx-auto max-w-7xl space-y-6 px-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 md:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-brand-navy">
@@ -158,7 +158,7 @@ export default function DashboardPage() {
             }}
             className={cn(
               buttonVariants({ size: "lg" }),
-              "inline-flex min-w-[200px] shrink-0 cursor-pointer items-center justify-center gap-2 bg-brand-blue text-white hover:bg-brand-blue/90",
+              "inline-flex h-11 w-full min-w-0 shrink-0 cursor-pointer items-center justify-center gap-2 bg-brand-blue text-white hover:bg-brand-blue/90 lg:h-12 lg:min-w-[200px] lg:w-auto",
               navigating && "cursor-not-allowed opacity-70",
             )}
           >
@@ -203,23 +203,26 @@ export default function DashboardPage() {
 
         {data && data.sessions.length > 0 ? (
           <>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by Request ID, customer name or GSTIN…"
-                className="h-11 w-full max-w-xl rounded-lg border border-border bg-white px-3 text-sm shadow-sm outline-none ring-brand-blue/30 focus:ring-2"
+                className="h-11 w-full rounded-lg border border-border bg-white px-3 text-sm shadow-sm outline-none ring-brand-blue/30 focus:ring-2 md:max-w-xl"
               />
-              <div className="flex items-center gap-2">
-                <label htmlFor="customer-filter" className="text-sm text-muted-foreground whitespace-nowrap">
+              <div className="flex w-full flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2 md:w-auto">
+                <label
+                  htmlFor="customer-filter"
+                  className="text-sm text-muted-foreground sm:whitespace-nowrap"
+                >
                   Customer
                 </label>
                 <select
                   id="customer-filter"
                   value={customerGstin}
                   onChange={(e) => setCustomerGstin(e.target.value)}
-                  className="h-11 min-w-[200px] rounded-lg border border-border bg-white px-3 text-sm shadow-sm"
+                  className="h-11 w-full min-w-0 rounded-lg border border-border bg-white px-3 text-sm shadow-sm sm:min-w-[200px] md:w-auto"
                 >
                   <option value="">All customers</option>
                   {customerOptions.map(([gstin, label]) => (

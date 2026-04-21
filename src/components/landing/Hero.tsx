@@ -44,9 +44,9 @@ export function Hero() {
 
   return (
     <section className="relative overflow-x-hidden overflow-y-visible dot-grid-bg">
-      <div className="mx-auto max-w-6xl px-4 pb-20 pt-16 sm:px-6 lg:flex lg:items-center lg:gap-12 lg:pt-20">
+      <div className="mx-auto max-w-6xl px-4 pb-20 pt-16 md:px-6 lg:flex lg:items-center lg:gap-12 lg:pt-20">
         <div className="max-w-xl flex-1">
-          <h1 className="text-4xl font-bold leading-tight text-brand-navy md:text-5xl lg:text-6xl">
+          <h1 className="text-3xl font-bold leading-tight text-brand-navy md:text-4xl lg:text-6xl">
             <span className="block">
               Reconcile{" "}
               <span className="whitespace-nowrap">GSTR-2B</span>
@@ -58,18 +58,18 @@ export function Hero() {
               </span>
             </span>
           </h1>
-          <p className="mt-6 text-lg text-slate-500 sm:text-xl">
+          <p className="mt-6 text-base text-slate-500 md:text-lg lg:text-xl">
             Upload your GSTR-2B and Purchase Register. Get ITC risk scores, exact mismatch
             details, and plain English actions for every invoice. Free. No login required.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap">
             <button
               type="button"
               disabled={navBusy !== null}
               onClick={() => goReconcile("primary")}
               className={cn(
                 buttonVariants({ size: "lg" }),
-                "min-w-[220px] bg-brand-blue px-6 text-base font-semibold text-white hover:bg-brand-blue/90",
+                "min-h-11 w-full bg-brand-blue px-6 text-base font-semibold text-white hover:bg-brand-blue/90 md:w-auto md:min-w-[220px]",
                 "inline-flex items-center justify-center gap-2 disabled:pointer-events-none disabled:opacity-70",
               )}
             >
@@ -93,7 +93,7 @@ export function Hero() {
               onClick={() => goReconcile("secondary")}
               className={cn(
                 buttonVariants({ size: "lg", variant: "outline" }),
-                "min-w-[200px] border-brand-navy text-brand-navy",
+                "min-h-11 w-full border-brand-navy text-brand-navy md:w-auto md:min-w-[200px]",
                 "inline-flex items-center justify-center gap-2 disabled:pointer-events-none disabled:opacity-70",
               )}
             >
@@ -112,8 +112,8 @@ export function Hero() {
           </div>
         </div>
 
-        <div className="relative mt-14 flex-1 lg:mt-0">
-          <div className="pointer-events-none rotate-1 rounded-xl border border-border bg-white p-3 shadow-xl ring-1 ring-black/5">
+        <div className="relative mt-14 hidden flex-1 md:mt-10 md:block lg:mt-0">
+          <div className="pointer-events-none max-w-lg rotate-1 rounded-xl border border-border bg-white p-2 shadow-xl ring-1 ring-black/5 md:p-3 lg:max-w-none">
             <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Sample output
             </p>

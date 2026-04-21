@@ -169,17 +169,17 @@ export default function ReconcilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
       {showGateModal ? <GateModal /> : null}
 
       {gstr2bFilePeriodMismatchVisible && gstr2bFilePeriod ? (
         <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[90] flex items-stretch justify-center bg-black/50 p-0 md:items-center md:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="gstr2b-period-mismatch-title"
         >
-          <div className="w-full max-w-md overflow-hidden rounded-xl border-t-4 border-brand-blue bg-white shadow-xl dark:border-brand-blue dark:bg-card">
+          <div className="flex w-full max-w-md flex-col overflow-y-auto rounded-none border-t-4 border-brand-blue bg-white shadow-xl dark:border-brand-blue dark:bg-card md:max-h-[min(640px,90vh)] md:rounded-xl">
             <div className="p-6 pt-5">
               <div className="flex justify-center">
                 <CalendarDays className="size-8 text-brand-blue" aria-hidden />
@@ -226,7 +226,7 @@ export default function ReconcilePage() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-6 border-b border-border pb-8 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 border-b border-border pb-8 md:flex-row md:items-start md:justify-between md:gap-6">
         <div>
           <h1 className="text-[28px] font-bold text-brand-navy">
             GSTR-2B Reconciliation
@@ -235,14 +235,16 @@ export default function ReconcilePage() {
             B2B Invoices — {getMonthName(month)} {year}
           </p>
         </div>
-        <MonthPicker
-          month={month}
-          year={year}
-          onChange={({ month: m, year: y }) => {
-            setMonth(m)
-            setYear(y)
-          }}
-        />
+        <div className="hidden shrink-0 md:block">
+          <MonthPicker
+            month={month}
+            year={year}
+            onChange={({ month: m, year: y }) => {
+              setMonth(m)
+              setYear(y)
+            }}
+          />
+        </div>
       </div>
 
       {config.maintenanceMode ? (
@@ -318,6 +320,17 @@ export default function ReconcilePage() {
                 />
               </CardContent>
             </Card>
+          </div>
+
+          <div className="md:hidden">
+            <MonthPicker
+              month={month}
+              year={year}
+              onChange={({ month: m, year: y }) => {
+                setMonth(m)
+                setYear(y)
+              }}
+            />
           </div>
 
           {volumeWarningBannerVisible ? (
@@ -554,6 +567,16 @@ export default function ReconcilePage() {
 
       {phase === "done" && summary && requestId ? (
         <div className="mt-10 space-y-6">
+          <div className="md:hidden">
+            <MonthPicker
+              month={month}
+              year={year}
+              onChange={({ month: m, year: y }) => {
+                setMonth(m)
+                setYear(y)
+              }}
+            />
+          </div>
           <RequestIdBanner requestId={requestId} />
           {guestPromoVisible ? <GuestPromoBanner onDismiss={dismissGuestPromo} /> : null}
           <SummaryCards summary={summary} results={results} />
@@ -629,6 +652,16 @@ export default function ReconcilePage() {
           </Card>
           {summary && results.length ? (
             <div className="mt-8 space-y-4">
+              <div className="md:hidden">
+                <MonthPicker
+                  month={month}
+                  year={year}
+                  onChange={({ month: m, year: y }) => {
+                    setMonth(m)
+                    setYear(y)
+                  }}
+                />
+              </div>
               <p className="text-sm text-muted-foreground">
                 Your last reconciliation is still shown below. Download the Excel report to
                 keep a copy.

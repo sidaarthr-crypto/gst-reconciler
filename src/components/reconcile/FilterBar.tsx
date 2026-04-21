@@ -47,7 +47,7 @@ export function FilterBar({
   }, [results])
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="-mx-1 flex flex-nowrap gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:thin] md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:h-1.5">
       {visiblePills.map((f) => {
         const n = f.count(results)
         const isOn = active === f.id
@@ -66,7 +66,7 @@ export function FilterBar({
               window.setTimeout(() => setBusyId(null), 120)
             }}
             className={cn(
-              "inline-flex min-w-[5.5rem] items-center justify-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+              "inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-3 py-2 text-sm font-medium transition-colors md:min-h-0 md:py-1.5",
               "disabled:pointer-events-none disabled:opacity-70",
               isOn
                 ? isQrmp

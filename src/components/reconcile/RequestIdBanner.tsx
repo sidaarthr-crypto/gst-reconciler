@@ -21,14 +21,14 @@ export function RequestIdBanner({ requestId }: { requestId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border border-l-4 border-l-brand-blue bg-brand-blue-lt p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-      <div className="flex gap-3">
+    <div className="flex flex-col gap-4 rounded-lg border border-border border-l-4 border-l-brand-blue bg-brand-blue-lt p-4 md:flex-row md:items-center md:justify-between md:gap-6">
+      <div className="flex min-w-0 gap-3">
         <Info className="mt-0.5 h-5 w-5 shrink-0 text-brand-blue" aria-hidden />
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Your Reconciliation ID
           </p>
-          <p className="font-mono text-lg font-semibold text-brand-navy">{requestId}</p>
+          <p className="break-all font-mono text-lg font-semibold text-brand-navy">{requestId}</p>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Save this ID to retrieve your report later. Use it to filter when history is
             available.
@@ -39,7 +39,7 @@ export function RequestIdBanner({ requestId }: { requestId: string }) {
         type="button"
         variant="outline"
         className={cn(
-          "min-w-[112px] shrink-0 border-brand-blue hover:bg-white",
+          "h-11 min-w-[112px] w-full shrink-0 border-brand-blue hover:bg-white md:h-10 md:w-auto",
           copied ? "border-emerald-600 text-emerald-700" : "text-brand-blue",
         )}
         onClick={copy}

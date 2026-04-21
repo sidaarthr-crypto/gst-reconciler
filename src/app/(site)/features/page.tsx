@@ -230,7 +230,7 @@ export default function FeaturesPage() {
   return (
     <div className="bg-white">
       <section className="relative dot-grid-bg border-b border-border">
-        <div className="mx-auto max-w-4xl px-6 py-14 sm:py-16">
+        <div className="mx-auto max-w-4xl px-4 py-14 sm:py-16 md:px-6">
           <p className="mb-4 inline-flex rounded-full bg-brand-blue/10 px-3 py-1 text-xs font-semibold text-brand-blue">
             Version 1.0 — B2B Invoices
           </p>
@@ -245,7 +245,7 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      <div className="mx-auto max-w-4xl space-y-16 px-6 py-14 sm:py-16">
+      <div className="mx-auto max-w-4xl space-y-16 px-4 py-14 sm:py-16 md:px-6">
         <section>
           <div className="flex justify-center">
             <div className="w-full max-w-xl rounded-xl border border-emerald-200 border-l-4 border-l-emerald-500 bg-[#F0FDF4] p-6 shadow-sm">
@@ -278,7 +278,7 @@ export default function FeaturesPage() {
             For each invoice in your GSTR-2B and Purchase Register, GSTRecon runs these checks
             automatically.
           </p>
-          <div className="mt-8 grid gap-5 sm:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
             {VALIDATION_CARDS.map((card) => {
               const Icon = card.icon
               const risk = RISK_BADGE[card.risk]
@@ -319,7 +319,7 @@ export default function FeaturesPage() {
 
         <section>
           <h2 className="text-2xl font-bold text-brand-navy">How GSTRecon Matches Invoices</h2>
-          <div className="mt-8 space-y-6">
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
             <div className="rounded-xl border border-border bg-slate-50/80 p-6">
               <p className="text-sm font-semibold text-brand-navy">Step 1 — Normalise</p>
               <p className="mt-2 text-sm text-slate-600">
@@ -354,7 +354,7 @@ export default function FeaturesPage() {
           <p className="mt-2 text-base text-slate-600">
             Every invoice is assigned a risk level based on GST rules.
           </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
             {[
               {
                 emoji: "🔴",

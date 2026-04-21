@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { buttonVariants } from "@/components/ui/button"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { formatDashboardRequestDate } from "@/lib/dashboard-dates"
 import type { DashboardSessionRow } from "@/lib/dashboard-types"
 import { cn, formatINR, getMonthName } from "@/lib/utils"
@@ -51,14 +52,22 @@ export function AllReconciliationRequestsTable({
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  const [showAllColumns, setShowAllColumns] = useState(false)
+  const isMdUp = useMediaQuery("(min-width: 768px)")
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
     key: "createdAt",
     dir: "desc",
   })
 
+  const compact = variant === "full" && !isMdUp && !showAllColumns
+
   useEffect(() => {
     setPage(0)
   }, [rows])
+
+  useEffect(() => {
+    if (isMdUp) setShowAllColumns(false)
+  }, [isMdUp])
 
   const sorted = useMemo(() => {
     const copy = [...rows]
@@ -127,14 +136,34 @@ export function AllReconciliationRequestsTable({
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[960px] border-collapse text-sm">
+      {variant === "full" && !isMdUp ? (
+        <button
+          type="button"
+          className="mt-3 min-h-11 w-full rounded-lg border border-border bg-slate-50 px-3 text-sm font-medium text-brand-navy hover:bg-slate-100"
+          onClick={() => setShowAllColumns((v) => !v)}
+        >
+          {showAllColumns ? "Show key columns only" : "Show all columns"}
+        </button>
+      ) : null}
+
+      <div
+        className={cn(
+          "mt-4 overflow-x-auto [-webkit-overflow-scrolling:touch]",
+          !compact && "scroll-table-hint",
+        )}
+      >
+        <table
+          className={cn(
+            "w-full border-collapse text-sm",
+            compact ? "min-w-[320px]" : "min-w-[960px]",
+          )}
+        >
           <thead>
             <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <th className="pb-3 pr-3">
                 <button
                   type="button"
-                  className="hover:text-brand-blue"
+                  className="min-h-11 hover:text-brand-blue md:min-h-0"
                   onClick={() => toggleSort("requestId")}
                 >
                   Request ID{sortIndicator("requestId")}
@@ -146,30 +175,35 @@ export function AllReconciliationRequestsTable({
               <th className="pb-3 pr-3">
                 <button
                   type="button"
-                  className="hover:text-brand-blue"
+                  className="min-h-11 hover:text-brand-blue md:min-h-0"
                   onClick={() => toggleSort("period")}
                 >
                   Period{sortIndicator("period")}
                 </button>
               </th>
-              <th className="pb-3 pr-3 text-right">
+              <th
+                className={cn(
+                  "pb-3 pr-3 text-right",
+                  compact && "hidden",
+                )}
+              >
                 <button
                   type="button"
-                  className="hover:text-brand-blue"
+                  className="min-h-11 hover:text-brand-blue md:min-h-0"
                   onClick={() => toggleSort("invoices")}
                 >
                   {variant === "customer" ? "Invoices" : "Total invoices"}
                   {sortIndicator("invoices")}
                 </button>
               </th>
-              <th className="pb-3 pr-3 text-center">Matched</th>
-              <th className="pb-3 pr-3 text-center">Mismatches</th>
+              <th className={cn("pb-3 pr-3 text-center", compact && "hidden")}>Matched</th>
+              <th className={cn("pb-3 pr-3 text-center", compact && "hidden")}>Mismatches</th>
               <th className="pb-3 pr-3 text-right">ITC at risk</th>
-              <th className="pb-3 pr-3">Status</th>
-              <th className="pb-3 pr-3">
+              <th className={cn("pb-3 pr-3", compact && "hidden")}>Status</th>
+              <th className={cn("pb-3 pr-3", compact && "hidden")}>
                 <button
                   type="button"
-                  className="hover:text-brand-blue"
+                  className="min-h-11 hover:text-brand-blue md:min-h-0"
                   onClick={() => toggleSort("createdAt")}
                 >
                   Date{sortIndicator("createdAt")}
@@ -235,15 +269,15 @@ export function AllReconciliationRequestsTable({
                   <td className="py-3 pr-3 text-brand-navy">
                     {getMonthName(r.month).slice(0, 3)} {r.year}
                   </td>
-                  <td className="py-3 pr-3 text-right tabular-nums">
+                  <td className={cn("py-3 pr-3 text-right tabular-nums", compact && "hidden")}>
                     {r.totalInvoices.toLocaleString("en-IN")}
                   </td>
-                  <td className="py-3 pr-3 text-center">
+                  <td className={cn("py-3 pr-3 text-center", compact && "hidden")}>
                     <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
                       {r.matchedCount}
                     </span>
                   </td>
-                  <td className="py-3 pr-3 text-center">
+                  <td className={cn("py-3 pr-3 text-center", compact && "hidden")}>
                     {mismatchTotal > 0 ? (
                       <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
                         {mismatchTotal}
@@ -259,8 +293,10 @@ export function AllReconciliationRequestsTable({
                       <span className="font-medium text-emerald-700">₹0 — Clean</span>
                     )}
                   </td>
-                  <td className="py-3 pr-3">{statusBadge(r.status)}</td>
-                  <td className="py-3 pr-3 text-muted-foreground">{formatDashboardRequestDate(r.createdAt)}</td>
+                  <td className={cn("py-3 pr-3", compact && "hidden")}>{statusBadge(r.status)}</td>
+                  <td className={cn("py-3 pr-3 text-muted-foreground", compact && "hidden")}>
+                    {formatDashboardRequestDate(r.createdAt)}
+                  </td>
                   <td className="py-3 text-right">
                     <button
                       type="button"
@@ -268,7 +304,7 @@ export function AllReconciliationRequestsTable({
                       onClick={(e) => onViewClick(e, r.requestId)}
                       className={cn(
                         buttonVariants({ variant: "outline", size: "sm" }),
-                        "min-w-[80px] inline-flex items-center justify-center gap-1.5",
+                        "inline-flex h-11 min-w-[80px] items-center justify-center gap-1.5 md:h-9",
                         loadingId === r.requestId && "pointer-events-none opacity-70",
                       )}
                     >

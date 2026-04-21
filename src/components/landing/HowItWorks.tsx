@@ -15,11 +15,11 @@ export function HowItWorks() {
   ]
   return (
     <section className="bg-surface-2 py-16">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+      <div className="mx-auto max-w-5xl px-4 md:px-6">
         <h2 className="text-center text-3xl font-bold text-brand-navy">How it works</h2>
         <div className="relative mt-12 grid gap-10 md:grid-cols-3">
           <div
-            className="pointer-events-none absolute left-[16%] right-[16%] top-8 hidden h-px bg-border-strong md:block"
+            className="pointer-events-none absolute left-[16%] right-[16%] top-8 hidden h-px bg-border-strong lg:block"
             aria-hidden
           />
           {steps.map((s, i) => (

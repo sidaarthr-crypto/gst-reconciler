@@ -66,9 +66,9 @@ function DeadlineCell({ row }: { row: ReconciliationRow }) {
   if (row.isDeadlineExpired) {
     return (
       <div className="leading-tight">
-        <div className="text-[11px] font-semibold text-[#DC2626]">EXPIRED</div>
-        <div className="text-[10px] text-[#DC2626]/90">{row.itcClaimDeadline}</div>
-        <div className="text-[10px] text-[#DC2626]/80">
+        <div className="text-xs font-semibold text-[#DC2626]">EXPIRED</div>
+        <div className="text-xs text-[#DC2626]/90">{row.itcClaimDeadline}</div>
+        <div className="text-xs text-[#DC2626]/80">
           ({Math.abs(row.daysToDeadline ?? 0)} days ago)
         </div>
       </div>
@@ -77,17 +77,17 @@ function DeadlineCell({ row }: { row: ReconciliationRow }) {
   if (row.isDeadlineWarning && !row.isDeadlineExpired) {
     return (
       <div className="leading-tight">
-        <div className="text-[11px] font-semibold text-[#D97706]">
+        <div className="text-xs font-semibold text-[#D97706]">
           {(row.daysToDeadline ?? 0).toString()} days left
         </div>
-        <div className="text-[10px] text-[#D97706]">{row.itcClaimDeadline}</div>
+        <div className="text-xs text-[#D97706]">{row.itcClaimDeadline}</div>
       </div>
     )
   }
   return (
     <div className="leading-tight text-muted-foreground">
-      <div className="text-[11px]">{row.itcClaimDeadline}</div>
-      <div className="text-[10px]">({(row.daysToDeadline ?? 0).toString()} days)</div>
+      <div className="text-xs">{row.itcClaimDeadline}</div>
+      <div className="text-xs">({(row.daysToDeadline ?? 0).toString()} days)</div>
     </div>
   )
 }
@@ -109,7 +109,7 @@ function CopyVendorMessageButton({
     <button
       type="button"
       className={cn(
-        "inline-flex items-center gap-0.5 border-0 bg-transparent p-0 text-left text-[11px] font-medium transition-colors",
+        "inline-flex min-h-11 items-center gap-0.5 border-0 bg-transparent p-0 text-left text-xs font-medium transition-colors md:min-h-0",
         copied ? "text-emerald-600" : "text-[#2563EB] hover:underline",
       )}
       onClick={async () => {
@@ -145,17 +145,21 @@ function InvoiceTable({
   const showDeadlineColumn = rows.some((r) => r.itcClaimDeadline != null)
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-white">
+    <div className="scroll-table-hint overflow-x-auto rounded-xl border border-border bg-white [-webkit-overflow-scrolling:touch]">
       <table
         className={cn(
-          "w-full border-collapse text-sm",
+          "w-full border-collapse text-xs md:text-sm",
           showDeadlineColumn ? "min-w-[2480px]" : "min-w-[2350px]",
         )}
       >
         <thead className="sticky top-0 z-10 bg-surface-2 text-left text-xs font-medium text-brand-navy shadow-[0_1px_0_0_var(--color-border)]">
           <tr>
-            <th className="w-[80px] whitespace-nowrap px-2 py-2">Risk</th>
-            <th className="w-[130px] px-2 py-2">Status</th>
+            <th className="w-[80px] whitespace-nowrap px-2 py-2 md:static md:bg-transparent max-md:sticky max-md:left-0 max-md:z-30 max-md:bg-surface-2 max-md:shadow-[4px_0_12px_-6px_rgba(0,0,0,0.12)]">
+              Risk
+            </th>
+            <th className="w-[130px] px-2 py-2 md:static md:bg-transparent max-md:sticky max-md:left-[80px] max-md:z-30 max-md:bg-surface-2 max-md:shadow-[4px_0_12px_-6px_rgba(0,0,0,0.12)]">
+              Status
+            </th>
             <th className="w-[160px] px-2 py-2">GSTIN</th>
             <th className="w-[160px] px-2 py-2">Supplier</th>
             <th className="w-[140px] px-2 py-2">Invoice No</th>
@@ -194,6 +198,13 @@ function InvoiceTable({
           {rows.map((row, idx) => {
             const td = formatDiff(row.taxableDiff)
             const showTaxType = row.isTaxTypeMismatch || row.status === "Tax Type Mismatch"
+            const isDupRow = row.status === "Duplicate" || row.isDuplicate
+            const stickyCell = (extra?: string) =>
+              cn(
+                !isDupRow &&
+                  "max-md:sticky max-md:z-20 max-md:shadow-[4px_0_12px_-8px_rgba(0,0,0,0.08)]",
+                extra,
+              )
             const deadlineTdClass = cn(
               "w-[130px] px-2 py-2 align-top text-xs",
               row.itcClaimDeadline != null &&
@@ -213,14 +224,26 @@ function InvoiceTable({
                 )}
                 style={rowBgStyle(row)}
               >
-                <td className="px-2 py-2 align-top">
+                <td
+                  className={cn(
+                    "px-2 py-2 align-top",
+                    stickyCell("max-md:left-0"),
+                    !isDupRow && rowBgClass(row),
+                  )}
+                >
                   <RiskBadge row={row} />
                 </td>
-                <td className="px-2 py-2 align-top">
+                <td
+                  className={cn(
+                    "px-2 py-2 align-top",
+                    stickyCell("max-md:left-[80px]"),
+                    !isDupRow && rowBgClass(row),
+                  )}
+                >
                   <div className="flex flex-wrap items-center gap-1">
                     <StatusBadge status={row.status} />
                     {(row.isRCM || row.status === "RCM Invoice") && (
-                      <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-violet-800">
+                      <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold uppercase text-violet-800">
                         RCM
                       </span>
                     )}
@@ -343,10 +366,14 @@ function ViewModeToggle({
     )
 
   return (
-    <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Results view">
+    <div
+      className="grid w-full shrink-0 grid-cols-2 gap-1 md:flex md:w-auto md:items-center"
+      role="group"
+      aria-label="Results view"
+    >
       <button
         type="button"
-        className={pill(viewMode === "invoice")}
+        className={cn(pill(viewMode === "invoice"), "min-h-11 justify-center md:min-h-0")}
         onClick={() => onViewMode("invoice")}
       >
         <List className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -354,7 +381,7 @@ function ViewModeToggle({
       </button>
       <button
         type="button"
-        className={pill(viewMode === "supplier")}
+        className={cn(pill(viewMode === "supplier"), "min-h-11 justify-center md:min-h-0")}
         onClick={() => onViewMode("supplier")}
       >
         <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -416,7 +443,7 @@ export function ReconciliationTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
           <FilterBar
             results={filterBar.results}

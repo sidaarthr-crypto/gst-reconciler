@@ -20,7 +20,7 @@ export function CTABanner() {
 
   return (
     <section className="bg-brand-navy py-14 text-white">
-      <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
+      <div className="mx-auto max-w-4xl px-4 text-center md:px-6">
         <h2 className="text-2xl font-bold sm:text-3xl">
           Ready to stop reconciling manually?
         </h2>
@@ -33,7 +33,7 @@ export function CTABanner() {
           onClick={go}
           className={cn(
             buttonVariants({ size: "lg" }),
-            "mt-8 min-w-[260px] bg-white font-semibold text-brand-navy hover:bg-surface-2",
+            "mt-8 w-full min-h-11 bg-white font-semibold text-brand-navy hover:bg-surface-2 md:w-auto md:min-w-[260px]",
             "inline-flex items-center justify-center gap-2 disabled:pointer-events-none disabled:opacity-70",
           )}
         >

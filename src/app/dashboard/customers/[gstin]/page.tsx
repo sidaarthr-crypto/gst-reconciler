@@ -221,7 +221,7 @@ function CustomerDashboardInner() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-[#F8FAFC] pb-16 pt-8">
-      <div className="mx-auto max-w-7xl space-y-6 px-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 md:px-6">
         <nav className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Link href="/dashboard" className="hover:text-brand-blue">
             Dashboard
@@ -230,7 +230,7 @@ function CustomerDashboardInner() {
           <span className="font-medium text-brand-navy">{customerName}</span>
         </nav>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             {stateBadge ? (
               <span className="mb-2 inline-flex rounded-full bg-brand-blue/10 px-2.5 py-0.5 text-xs font-medium text-brand-blue">
@@ -244,7 +244,7 @@ function CustomerDashboardInner() {
             href="/reconcile"
             className={cn(
               buttonVariants({ size: "lg" }),
-              "inline-flex shrink-0 items-center gap-2 bg-brand-blue text-white hover:bg-brand-blue/90",
+              "inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 bg-brand-blue text-white hover:bg-brand-blue/90 md:h-12 md:w-auto",
             )}
           >
             <Plus className="h-4 w-4" aria-hidden />
@@ -256,12 +256,12 @@ function CustomerDashboardInner() {
 
         <div>
           <p className="text-sm font-medium text-brand-navy">Filter by period:</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="-mx-1 mt-2 flex flex-nowrap gap-2 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:thin] md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:h-1.5">
             <button
               type="button"
               onClick={() => setPeriodFilter(null)}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                "shrink-0 rounded-full border px-3 py-2 text-sm font-medium transition-colors md:py-1.5",
                 !periodParsed
                   ? "border-brand-blue bg-brand-blue text-white"
                   : "border-border bg-white text-slate-700 hover:border-brand-blue/40",
@@ -278,7 +278,7 @@ function CustomerDashboardInner() {
                   type="button"
                   onClick={() => setPeriodFilter(p)}
                   className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                    "shrink-0 rounded-full border px-3 py-2 text-sm font-medium transition-colors md:py-1.5",
                     active
                       ? "border-brand-blue bg-brand-blue text-white"
                       : "border-border bg-white text-slate-700 hover:border-brand-blue/40",

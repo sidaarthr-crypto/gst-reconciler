@@ -3,7 +3,7 @@ import { Clock } from "lucide-react"
 export function TrustBar() {
   return (
     <section className="border-y border-border bg-surface-3 py-8">
-      <div className="mx-auto grid max-w-4xl grid-cols-1 items-center justify-items-center gap-6 px-4 sm:grid-cols-3 sm:gap-10">
+      <div className="mx-auto grid max-w-4xl grid-cols-2 items-center justify-items-center gap-4 px-4 md:grid-cols-3 md:gap-10 md:px-6">
         <div className="flex w-full justify-center">
           <span className="relative inline-flex items-center gap-2 rounded-full bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white">
             <span

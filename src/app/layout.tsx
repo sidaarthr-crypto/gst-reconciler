@@ -20,12 +20,18 @@ const mono = JetBrains_Mono({
   variable: "--font-mono",
 })
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "GSTRecon"
-
 export const metadata: Metadata = {
-  title: `${appName} — GSTR-2B Reconciliation for CAs`,
+  title: "GSTRecon — GSTR-2B Reconciliation for CAs",
   description:
-    "Upload GSTR-2B and your Purchase Register to match every B2B invoice, quantify ITC at risk, and export a CA-ready Excel report.",
+    "Upload your GSTR-2B and Purchase Register. Get ITC risk scores, mismatch details, and plain English actions instantly.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
 }
 
 export default function RootLayout({

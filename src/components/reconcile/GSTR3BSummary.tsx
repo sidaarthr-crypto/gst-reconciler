@@ -147,7 +147,7 @@ export function GSTR3BSummary({ summary: s, period }: { summary: GSTR3BSummary; 
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col rounded-lg border border-border">
               <div className="space-y-2 border-b border-border p-4">
                 <p className="text-[13px] font-semibold text-emerald-700">✓ Claim in Table 4A(5)</p>

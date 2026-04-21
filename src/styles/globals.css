@@ -137,12 +137,44 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    @apply font-sans overflow-x-clip;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-clip;
     font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   }
-  html {
-    @apply font-sans;
+}
+
+/* Toasts: full-width bottom on small screens, default top-center on md+ */
+@media (max-width: 767px) {
+  [data-sonner-toaster] {
+    bottom: env(safe-area-inset-bottom, 0px) !important;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 8px 12px !important;
+  }
+  [data-sonner-toaster] [data-sonner-toast] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Horizontal scroll affordance for table wrappers on touch devices */
+.scroll-table-hint {
+  position: relative;
+}
+@media (max-width: 767px) {
+  .scroll-table-hint::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 24px;
+    background: linear-gradient(to left, rgb(255 255 255 / 0.95), transparent);
   }
 }
 

@@ -28,14 +28,14 @@ export function MonthPicker({
   )
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="space-y-1.5">
+    <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap md:items-end">
+      <div className="min-w-0 flex-1 space-y-1.5 md:flex-initial">
         <Label className="text-xs text-muted-foreground">Month</Label>
         <Select
           value={String(month)}
           onValueChange={(v) => onChange({ month: Number(v), year })}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="h-11 w-full md:w-[160px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -47,13 +47,13 @@ export function MonthPicker({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1.5">
+      <div className="min-w-0 flex-1 space-y-1.5 md:flex-initial">
         <Label className="text-xs text-muted-foreground">Year</Label>
         <Select
           value={String(year)}
           onValueChange={(v) => onChange({ month, year: Number(v) })}
         >
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className="h-11 w-full md:w-[120px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

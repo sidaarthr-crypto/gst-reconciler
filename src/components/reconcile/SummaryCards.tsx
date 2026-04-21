@@ -71,7 +71,7 @@ export function SummaryCards({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         <Card className="border-border shadow-sm">
           <CardContent className="flex gap-4 p-5">
             <FileText className="h-8 w-8 shrink-0 text-brand-blue" aria-hidden />
@@ -125,7 +125,7 @@ export function SummaryCards({
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-risk-critical border-border shadow-sm md:col-span-2 lg:col-span-4">
+        <Card className="col-span-2 border-l-4 border-l-risk-critical border-border shadow-sm md:col-span-3 lg:col-span-4">
           <CardContent className="flex flex-col gap-2 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <AlertOctagon className="h-10 w-10 shrink-0 text-risk-critical" aria-hidden />

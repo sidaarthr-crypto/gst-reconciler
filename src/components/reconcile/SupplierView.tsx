@@ -214,18 +214,18 @@ function MiniInvoiceTable({
 }) {
   const visible = showAll ? rows : rows.slice(0, MINI_INITIAL)
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-xs">
+    <div className="scroll-table-hint overflow-x-auto [-webkit-overflow-scrolling:touch]">
+      <table className="w-full min-w-[360px] border-collapse text-xs">
         <thead>
-          <tr className="border-b border-border text-left text-[11px] font-medium text-muted-foreground">
+          <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
             <th className="px-2 py-2">Risk</th>
             <th className="px-2 py-2">Status</th>
             <th className="px-2 py-2">Invoice No</th>
-            <th className="px-2 py-2">Date</th>
-            <th className="px-2 py-2 text-right">Taxable (2B)</th>
-            <th className="px-2 py-2 text-right">Taxable (PR)</th>
+            <th className="hidden px-2 py-2 md:table-cell">Date</th>
+            <th className="hidden px-2 py-2 text-right md:table-cell">Taxable (2B)</th>
+            <th className="hidden px-2 py-2 text-right md:table-cell">Taxable (PR)</th>
             <th className="px-2 py-2 text-right">ITC At Risk</th>
-            <th className="px-2 py-2">Urgency</th>
+            <th className="hidden px-2 py-2 md:table-cell">Urgency</th>
           </tr>
         </thead>
         <tbody>
@@ -243,9 +243,13 @@ function MiniInvoiceTable({
                 <StatusBadge status={row.status} />
               </td>
               <td className="px-2 py-1.5 font-mono align-top">{row.invoiceNumber}</td>
-              <td className="px-2 py-1.5 align-top">{row.invoiceDate}</td>
-              <td className="px-2 py-1.5 text-right align-top tabular-nums">{formatINR(row.taxable2B)}</td>
-              <td className="px-2 py-1.5 text-right align-top tabular-nums">{formatINR(row.taxablePR)}</td>
+              <td className="hidden px-2 py-1.5 align-top md:table-cell">{row.invoiceDate}</td>
+              <td className="hidden px-2 py-1.5 text-right align-top tabular-nums md:table-cell">
+                {formatINR(row.taxable2B)}
+              </td>
+              <td className="hidden px-2 py-1.5 text-right align-top tabular-nums md:table-cell">
+                {formatINR(row.taxablePR)}
+              </td>
               <td
                 className={cn(
                   "px-2 py-1.5 text-right align-top tabular-nums font-semibold",
@@ -254,7 +258,7 @@ function MiniInvoiceTable({
               >
                 {formatINR(row.totalITCAtRisk)}
               </td>
-              <td className="px-2 py-1.5 align-top">
+              <td className="hidden px-2 py-1.5 align-top md:table-cell">
                 <ActionBadge urgency={row.actionUrgency} />
               </td>
             </tr>
@@ -435,59 +439,61 @@ export function SupplierView({
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-end gap-x-10 gap-y-3 lg:justify-center">
+                  <div className="grid w-full grid-cols-2 gap-x-6 gap-y-3 lg:flex lg:w-auto lg:flex-wrap lg:items-end lg:justify-center">
                     <div>
                       <p className="text-lg font-bold text-brand-navy">{g.totalInvoices}</p>
-                      <p className="text-[11px] text-muted-foreground">invoices</p>
+                      <p className="text-xs text-muted-foreground">invoices</p>
                     </div>
                     {g.matchedCount > 0 ? (
                       <div>
                         <p className="text-lg font-bold text-[#16A34A]">{g.matchedCount}</p>
-                        <p className="text-[11px] text-muted-foreground">matched</p>
+                        <p className="text-xs text-muted-foreground">matched</p>
                       </div>
                     ) : null}
                     {g.mismatchCount > 0 ? (
                       <div>
                         <p className="text-lg font-bold text-[#D97706]">{g.mismatchCount}</p>
-                        <p className="text-[11px] text-muted-foreground">mismatch</p>
+                        <p className="text-xs text-muted-foreground">mismatch</p>
                       </div>
                     ) : null}
                     {g.missingCount > 0 ? (
                       <div>
                         <p className="text-lg font-bold text-[#EA580C]">{g.missingCount}</p>
-                        <p className="text-[11px] text-muted-foreground">missing</p>
+                        <p className="text-xs text-muted-foreground">missing</p>
                       </div>
                     ) : null}
                     {g.criticalCount > 0 ? (
                       <div>
                         <p className="text-lg font-bold text-[#DC2626]">{g.criticalCount}</p>
-                        <p className="text-[11px] text-muted-foreground">critical</p>
+                        <p className="text-xs text-muted-foreground">critical</p>
                       </div>
                     ) : null}
                   </div>
 
-                  <div className="flex flex-wrap items-end justify-between gap-4 lg:justify-end">
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-[#16A34A]">{formatINR(g.itcSafe)}</p>
-                      <p className="text-[11px] text-muted-foreground">ITC safe</p>
+                  <div className="flex w-full max-lg:order-last max-lg:flex-col max-lg:gap-3 max-lg:border-t max-lg:border-slate-100 max-lg:pt-3 lg:w-auto lg:flex-row lg:flex-wrap lg:items-end lg:justify-end lg:gap-4 lg:border-t-0 lg:pt-0">
+                    <div className="flex w-full justify-between gap-6 lg:w-auto lg:justify-end">
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-[#16A34A]">{formatINR(g.itcSafe)}</p>
+                        <p className="text-xs text-muted-foreground">ITC safe</p>
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={cn(
+                            "text-sm font-semibold",
+                            g.itcAtRisk > 0 ? "text-[#DC2626]" : "text-muted-foreground",
+                          )}
+                        >
+                          {formatINR(g.itcAtRisk)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">at risk</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p
-                        className={cn(
-                          "text-sm font-semibold",
-                          g.itcAtRisk > 0 ? "text-[#DC2626]" : "text-muted-foreground",
-                        )}
-                      >
-                        {formatINR(g.itcAtRisk)}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">at risk</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-2">
                       {supplierNeedsFollowUp && vendorMessage ? (
                         <button
                           type="button"
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-md border border-border bg-white px-2.5 py-1.5 text-xs font-medium text-brand-navy shadow-sm transition-colors hover:bg-slate-50",
+                            "inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-md border border-border bg-white px-2.5 py-2 text-xs font-medium text-brand-navy shadow-sm transition-colors hover:bg-slate-50 lg:w-auto lg:min-h-0 lg:py-1.5",
                             showingCopiedAll && "border-emerald-200 text-emerald-700",
                           )}
                           onClick={(e) => {
@@ -505,7 +511,7 @@ export function SupplierView({
                           )}
                         </button>
                       ) : null}
-                      <div className="flex h-9 w-9 items-center justify-center text-brand-navy">
+                      <div className="flex h-11 w-full items-center justify-center text-brand-navy lg:h-9 lg:w-9">
                         <ChevronDown
                           className={cn(
                             "pointer-events-none h-[18px] w-[18px] shrink-0 transition-transform duration-200 ease-in-out",

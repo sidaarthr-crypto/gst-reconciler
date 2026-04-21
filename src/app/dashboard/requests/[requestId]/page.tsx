@@ -172,7 +172,7 @@ export default function RequestDetailPage() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-[#F8FAFC] pb-16 pt-8">
-      <div className="mx-auto max-w-7xl space-y-6 px-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 md:px-6">
         <nav className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
           <Link href="/dashboard" className="hover:text-brand-blue">
             Dashboard
@@ -192,7 +192,7 @@ export default function RequestDetailPage() {
           <span className="font-mono text-brand-navy">{session.requestId}</span>
         </nav>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 space-y-3">
             <button
               type="button"
@@ -229,8 +229,8 @@ export default function RequestDetailPage() {
               </Link>
             ) : null}
           </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-start sm:justify-end">
-            <div className="flex w-full flex-col sm:w-auto sm:items-end">
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-start md:justify-end">
+            <div className="flex w-full flex-col md:w-auto md:items-end">
               <button
                 type="button"
                 disabled={navigating}
@@ -239,7 +239,7 @@ export default function RequestDetailPage() {
                   router.push("/reconcile")
                 }}
                 className={cn(
-                  "inline-flex min-w-[200px] items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-medium text-white hover:bg-brand-blue/90",
+                  "inline-flex h-11 min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 text-sm font-medium text-white hover:bg-brand-blue/90 md:w-auto md:min-w-[200px]",
                   navigating && "cursor-not-allowed opacity-70",
                 )}
               >
@@ -259,7 +259,7 @@ export default function RequestDetailPage() {
             </div>
             <Button
               type="button"
-              className="w-full shrink-0 bg-brand-blue text-white hover:bg-brand-blue/90 sm:w-auto"
+              className="h-11 min-h-11 w-full shrink-0 bg-brand-blue text-white hover:bg-brand-blue/90 md:h-10 md:w-auto"
               disabled={!summary || !results.length || exportBusy}
               onClick={() => onExport()}
             >
@@ -294,7 +294,7 @@ export default function RequestDetailPage() {
           />
         </div>
 
-        <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50 p-6 text-sm shadow-sm md:flex-row md:justify-between">
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50 p-4 text-sm shadow-sm md:flex-row md:justify-between md:p-6">
           <div className="space-y-2 text-muted-foreground">
             <p>
               <span className="font-medium text-brand-navy">GSTR-2B:</span> {session.gstr2bFilename} ·{" "}
@@ -305,7 +305,7 @@ export default function RequestDetailPage() {
               {session.prRowCount.toLocaleString("en-IN")} rows
             </p>
           </div>
-          <div className="space-y-2 text-right text-muted-foreground">
+          <div className="space-y-2 text-left text-muted-foreground md:text-right">
             <p>
               <span className="font-medium text-brand-navy">Reconciled:</span> {reconciledDisplay}
             </p>

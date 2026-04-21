@@ -9,12 +9,12 @@ import { cn } from "@/lib/utils"
 export function GateModal() {
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/50 p-0 md:items-center md:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="gate-title"
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+      <div className="flex w-full max-w-md flex-col overflow-y-auto rounded-none bg-white p-6 shadow-xl md:max-h-[min(720px,90vh)] md:rounded-2xl md:p-8">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-blue-lt">
           <Lock className="h-10 w-10 text-brand-blue" aria-hidden />
         </div>

@@ -130,8 +130,7 @@ export function MonthlyChart({
         <h2 className="text-lg font-semibold text-brand-navy">{title}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         <div
-          className="mt-6 flex h-[280px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface-2 text-center"
-          style={{ minHeight: 280 }}
+          className="mt-6 flex h-[220px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface-2 text-center md:h-[280px]"
         >
           <BarChart2 className="h-12 w-12 text-muted-foreground/60" aria-hidden />
           <p className="font-medium text-brand-navy">No reconciliation data yet</p>
@@ -165,7 +164,7 @@ export function MonthlyChart({
           ITC at risk
         </span>
       </div>
-      <div className="mt-4 h-[280px] w-full">
+      <div className="mt-4 h-[220px] w-full md:h-[280px]">
         <Bar data={data} options={options} />
       </div>
     </div>

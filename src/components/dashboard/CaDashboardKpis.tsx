@@ -16,7 +16,7 @@ export type CaKpiCard = {
 
 export function CaDashboardKpis({ items }: { items: CaKpiCard[] }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       {items.map((c) => (
         <div
           key={c.title}
