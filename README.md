@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GSTRecon (gst-reconciler)
 
-## Getting Started
+Production-oriented Next.js app for **GSTR-2B vs Purchase Register** B2B reconciliation: parse uploads in the browser, score ITC risk per invoice, persist results to **Supabase**, and export an Excel report.
 
-First, run the development server:
+## Prerequisites
+
+- Node.js **22+** (project targets modern Next.js; use `nvm` / `fnm` if your system Node is older)
+- A **Supabase** project (Postgres + anon key)
+
+## Setup
+
+```bash
+cd gst-reconciler
+npm install
+```
+
+Copy environment variables:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` and set **real** values (never commit secrets). The Supabase client validates the URL at startup, so use a full `https://…supabase.co` URL (the committed template uses a placeholder host you must replace).
+
+- `NEXT_PUBLIC_SUPABASE_URL` — Project URL from Supabase **Settings → API**
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — `anon` `public` key (same screen)
+- `NEXT_PUBLIC_APP_NAME` — e.g. `GSTRecon`
+- `NEXT_PUBLIC_APP_VERSION` — e.g. `1.0.0`
+
+The app reads configuration only from `process.env` / `import.meta` equivalents for these public keys.
+
+## Supabase database
+
+1. Open the Supabase SQL editor for your project.
+2. Paste and run the migration at `src/supabase/migrations/001_initial_schema.sql`.
+
+This creates tables `reconciliation_sessions`, `gstr2b_invoices`, `purchase_register_invoices`, `reconciliation_results`, `app_config`, indexes, and the `sessions_updated_at` trigger.
+
+If the trigger statement errors on older Postgres, replace `EXECUTE FUNCTION` with `EXECUTE PROCEDURE` for the same trigger definition.
+
+### Row Level Security (optional)
+
+If you enable RLS on these tables, add policies that allow the operations your deployment needs (e.g. anonymous insert/select for a public demo, or authenticated users only). The API routes use the **anon** client as wired in `src/lib/supabase.ts`.
+
+## Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Landing: [http://localhost:3000](http://localhost:3000)
+- Reconcile: [http://localhost:3000/reconcile](http://localhost:3000/reconcile)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+```
 
-## Learn More
+Ensure `.env.local` contains non-empty Supabase URL and anon key so `src/lib/supabase.ts` can initialise at import time.
 
-To learn more about Next.js, take a look at the following resources:
+## Deploy to Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Push the repository to GitHub/GitLab/Bitbucket.
+2. Import the project in [Vercel](https://vercel.com) as a Next.js app.
+3. Under **Project → Settings → Environment Variables**, add the same keys as in `.env.example` (with real values for production).
+4. `vercel.json` pins the **Mumbai (`bom1`)** region for lower latency in India.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project layout (high level)
 
-## Deploy on Vercel
+- `src/app` — App Router pages and `api/*` route handlers
+- `src/components` — UI (landing + reconcile + shadcn `ui/`)
+- `src/lib` — Types, Supabase client, parsing, reconciliation engine, export, config
+- `src/hooks` — Client hooks for config and reconciliation flow
+- `src/supabase/migrations` — SQL to run in Supabase
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Licence
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Use and modify for your practice or product; ensure compliance with GST law and your own data retention policies.

@@ -1,0 +1,232 @@
+export type ITCStatus = "Y" | "N" | "T"
+export type MismatchStatus =
+  | "Matched"
+  | "Value Mismatch"
+  | "Tax Type Mismatch"
+  | "Suggested Match"
+  | "In 2B Only"
+  | "In PR Only"
+  | "QRMP Delay"
+  | "Duplicate"
+  | "RCM Invoice"
+
+export type ITCBlockReason = "permanent" | "conditional" | null
+
+export type ITCRiskLevel = "Safe" | "Medium" | "High" | "Critical"
+export type ActionUrgency =
+  | "Immediate"
+  | "Before Filing"
+  | "Monitor"
+  | "None"
+export type SessionStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed"
+
+/** Filter pill ids: status values plus synthetic filters */
+export type ReconciliationFilterId =
+  | MismatchStatus
+  | "All"
+  | "DeadlineWarning"
+  | "PosIssues"
+
+export interface AppConfig {
+  itcMatchToleranceInr: number
+  maxFileRows: number
+  requestIdPrefix: string
+  supportedInvoiceTypes: string
+  appVersion: string
+  maintenanceMode: boolean
+  freeTierMaxRows: number
+  showSampleDataButton: boolean
+}
+
+export interface GSTR2BRow {
+  supplierGSTIN: string
+  supplierName: string
+  supplierFilingDate: string
+  invoiceNumber: string
+  invoiceType: string
+  /** Supplier return period from GSTR-2B (`MMYYYY`; months 01, 04, 07, 10 = QRMP quarter starts). */
+  supprd?: string
+  invoiceDate: string
+  invoiceValue: number
+  placeOfSupply: string
+  reverseCharge: "Y" | "N"
+  itcAvailable: ITCStatus
+  itcUnavailableReason?: string
+  taxableValue: number
+  igst: number
+  cgst: number
+  sgst: number
+  cess: number
+  taxRate: number
+}
+
+export interface PurchaseRegisterRow {
+  supplierGSTIN: string
+  supplierName: string
+  invoiceNumber: string
+  invoiceDate: string
+  taxableValue: number
+  igst: number
+  cgst: number
+  sgst: number
+  cess: number
+  totalInvoiceValue: number
+  placeOfSupply?: string
+  hsnCode?: string
+  /** Optional explicit rate %; inferred in reconcile when missing */
+  taxRate?: number
+}
+
+export interface ReconciliationRow {
+  id?: string
+  supplierGSTIN: string
+  supplierName: string
+  invoiceNumber: string
+  invoiceDate: string
+  placeOfSupply: string
+  matchKey: string
+  status: MismatchStatus
+  itcRisk: ITCRiskLevel
+  itcAvailable: ITCStatus | null
+  reverseCharge: "Y" | "N" | null
+  taxable2B: number | null
+  igst2B: number | null
+  cgst2B: number | null
+  sgst2B: number | null
+  taxablePR: number | null
+  igstPR: number | null
+  cgstPR: number | null
+  sgstPR: number | null
+  taxableDiff: number | null
+  igstDiff: number | null
+  cgstDiff: number | null
+  sgstDiff: number | null
+  totalITCAtRisk: number
+  recommendedAction: string
+  actionUrgency: ActionUrgency
+  riskSortOrder: number
+
+  isTaxTypeMismatch?: boolean
+  totalTax2B?: number | null
+  totalTaxPR?: number | null
+
+  isSuggestedMatch?: boolean
+  matchConfidence?: number | null
+  suggestedMatchReason?: string | null
+
+  isDuplicate?: boolean
+  duplicateOf?: string | null
+
+  isRCM?: boolean
+
+  itcBlockReason?: ITCBlockReason
+
+  itcClaimDeadline?: string | null
+  daysToDeadline?: number | null
+  isDeadlineWarning?: boolean
+  isDeadlineExpired?: boolean
+
+  isPOSMismatch?: boolean
+  posWarning?: string | null
+
+  taxRate2B?: number | null
+  taxRatePR?: number | null
+  isTaxRateMismatch?: boolean
+
+  cessDiff?: number | null
+  isCessMismatch?: boolean
+
+  isTimingMismatch?: boolean
+  timingNote?: string | null
+
+  /** True when row was classified as quarterly-filer timing (QRMP), not a supplier default. */
+  isQRMP?: boolean
+  qrmpNote?: string | null
+}
+
+/** Period label + optional CA display name for vendor follow-up copy helpers. */
+export type VendorMessageContext = {
+  period: string
+  caName?: string
+}
+
+export interface ReconciliationSummary {
+  totalInvoices: number
+  matchedCount: number
+  valueMismatchCount: number
+  in2BOnlyCount: number
+  inPROnlyCount: number
+  /** Invoices classified as QRMP quarterly filing delay (monitor only). */
+  qrmpCount: number
+  totalITCAtRisk: number
+  totalITCSafe: number
+  taxTypeMismatchCount: number
+  suggestedMatchCount: number
+  duplicateCount: number
+  rcmInvoiceCount: number
+  deadlineExpiredCount: number
+  deadlineWarningCount: number
+  posMismatchCount: number
+  totalCESSAtRisk: number
+}
+
+export interface ReconciliationSession {
+  id: string
+  requestId: string
+  status: SessionStatus
+  month: number
+  year: number
+  gstr2bFilename: string
+  gstr2bRowCount: number
+  prFilename: string
+  prRowCount: number
+  summary: ReconciliationSummary
+  errorMessage?: string
+  createdAt: string
+  completedAt?: string
+}
+
+export type FileValidationConfidence = "high" | "medium" | "low"
+
+export interface FileValidationResult {
+  isValid: boolean
+  confidence: FileValidationConfidence
+  warnings: string[]
+  errors: string[]
+  /** Non-blocking notices (e.g. rows excluded from processing). */
+  info: string[]
+  /** Original workbook sheet tab names (GSTR-2B .xlsx only; empty for CSV / PR). */
+  foundSheets: string[]
+  /** False when an .xlsx GSTR-2B file has no B2B tab (CSV exports treated as OK). */
+  hasB2BSheet: boolean
+  /** Data rows on the B2B sheet after invoice-type (typ) filter, before GSTIN/invoice row drops. */
+  b2bRowCount: number
+  /** Rows excluded by typ filter (SEZ / deemed export / non-R). */
+  skippedRowCount: number
+  /** All data rows read from the B2B sheet before typ filtering. */
+  totalRowsParsed: number
+}
+
+export interface ParseResult<T> {
+  rows: T[]
+  filename: string
+  rowCount: number
+  errors: string[]
+  /** Rows read from B2B sheet before typ filter (GSTR-2B only). */
+  totalParsed?: number
+  /** Rows dropped by typ filter (GSTR-2B only). */
+  skipped?: number
+  /** Deep file checks (GSTN shape, GSTINs, etc.). When missing, treat as verified. */
+  validation?: FileValidationResult
+  /** Recipient (taxpayer) from GSTR-2B header row 2 — GSTR-2B parse only. */
+  recipientGSTIN?: string | null
+  recipientName?: string | null
+  returnPeriod?: string | null
+  /** Parsed from header `Return Period` (e.g. April 2024, 042024) — GSTR-2B parse only. */
+  detectedMonth?: number | null
+  detectedYear?: number | null
+}
