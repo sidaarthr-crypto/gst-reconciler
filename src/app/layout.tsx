@@ -21,16 +21,13 @@ const mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "GSTRecon — GSTR-2B Reconciliation for CAs",
+  title: "GSTRecon — GSTR-2B Reconciliation",
   description:
     "Upload your GSTR-2B and Purchase Register. Get ITC risk scores, mismatch details, and plain English actions instantly.",
   icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
-    ],
-    apple: "/favicon.svg",
+    icon: "/favicon.svg",
     shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
 }
 
