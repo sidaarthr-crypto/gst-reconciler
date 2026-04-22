@@ -208,9 +208,11 @@ export function getRiskSortOrder(risk: ITCRiskLevel): number {
       return 1
     case "Medium":
       return 2
+    case "Low":
+      return 3
     case "Safe":
     default:
-      return 3
+      return 4
   }
 }
 

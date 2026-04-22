@@ -46,6 +46,7 @@ function rowBgClass(row: ReconciliationRow) {
   if (row.status === "QRMP Delay") return "bg-[#F8FAFC]"
   if (row.itcRisk === "Critical") return "bg-[#FFF8F8]"
   if (row.itcRisk === "High") return "bg-[#FFFAF5]"
+  if (row.itcRisk === "Low") return "bg-sky-50/80"
   return "bg-white"
 }
 

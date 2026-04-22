@@ -13,6 +13,7 @@ const RISK_STYLES: Record<
   Critical: { fill: "FEF2F2", font: "DC2626" },
   High: { fill: "FFF7ED", font: "EA580C" },
   Medium: { fill: "FFFBEB", font: "D97706" },
+  Low: { fill: "E0F2FE", font: "0369A1" },
   Safe: { fill: "F0FDF4", font: "16A34A" },
 }
 

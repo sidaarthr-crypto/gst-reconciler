@@ -62,7 +62,8 @@ const RISK_RANK: Record<ITCRiskLevel, number> = {
   Critical: 0,
   High: 1,
   Medium: 2,
-  Safe: 3,
+  Low: 3,
+  Safe: 4,
 }
 
 function stateFromGstin(gstin: string): { stateCode: string; stateName: string } {
@@ -196,6 +197,8 @@ function accentBorder(risk: ITCRiskLevel): string {
       return "border-l-[#EA580C]"
     case "Medium":
       return "border-l-[#D97706]"
+    case "Low":
+      return "border-l-sky-500"
     default:
       return "border-l-[#16A34A]"
   }

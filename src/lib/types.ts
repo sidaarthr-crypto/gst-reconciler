@@ -12,7 +12,7 @@ export type MismatchStatus =
 
 export type ITCBlockReason = "permanent" | "conditional" | null
 
-export type ITCRiskLevel = "Safe" | "Medium" | "High" | "Critical"
+export type ITCRiskLevel = "Safe" | "Low" | "Medium" | "High" | "Critical"
 export type ActionUrgency =
   | "Immediate"
   | "Before Filing"

@@ -22,6 +22,11 @@ const styles: Record<
     pill: "bg-risk-medium-bg text-risk-medium",
     text: "text-risk-medium",
   },
+  Low: {
+    dot: "bg-sky-500",
+    pill: "bg-sky-50 text-sky-900",
+    text: "text-sky-900",
+  },
   Safe: {
     dot: "bg-risk-safe",
     pill: "bg-risk-safe-bg text-risk-safe",

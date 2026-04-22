@@ -31,6 +31,78 @@ export function isQRMPSupplier(supprd: string): boolean {
   return [1, 4, 7, 10].includes(month)
 }
 
+/**
+ * True when the supplier files under QRMP (quarterly `supprd`) and the invoice
+ * belongs to a different calendar month/year than the CA's reconciliation period.
+ * Same month/year as reconciliation → not flagged (claim timing is fine).
+ */
+export function isQRMPInvoice(
+  b2bRow: GSTR2BRow,
+  reconciliationMonth: number,
+  reconciliationYear: number,
+): boolean {
+  const supprd = (b2bRow.supprd ?? "").trim()
+  if (!supprd || supprd.length < 6) return false
+
+  const filingMonth = Number.parseInt(supprd.substring(0, 2), 10)
+  if (!Number.isFinite(filingMonth)) return false
+
+  const isQuarterly = [1, 4, 7, 10].includes(filingMonth)
+  if (!isQuarterly) return false
+
+  const id = parseInvoiceDateFlexible(b2bRow.invoiceDate ?? "")
+  if (!id) return false
+
+  const invoiceMonth = id.getMonth() + 1
+  const invoiceYear = id.getFullYear()
+
+  return (
+    invoiceMonth !== reconciliationMonth || invoiceYear !== reconciliationYear
+  )
+}
+
+function resolveB2BForRow(row: ReconciliationRow, map2B: Map<string, GSTR2BRow>): GSTR2BRow | undefined {
+  const direct = map2B.get(row.matchKey)
+  if (direct) return direct
+  const g = row.supplierGSTIN.trim()
+  if (!g) return undefined
+  for (const b of map2B.values()) {
+    if (b.supplierGSTIN.trim() !== g) continue
+    if (makeMatchKey(b.supplierGSTIN, b.invoiceNumber) === row.matchKey) return b
+  }
+  for (const b of map2B.values()) {
+    if (b.supplierGSTIN.trim() !== g) continue
+    if (fuzzyMatchScore(b.invoiceNumber, row.invoiceNumber) >= 80) return b
+  }
+  return undefined
+}
+
+function applyCrossPeriodQrmpOverrides(
+  results: ReconciliationRow[],
+  map2B: Map<string, GSTR2BRow>,
+  recMonth: number | undefined,
+  recYear: number | undefined,
+): void {
+  if (recMonth == null || recYear == null) return
+  for (const row of results) {
+    if (row.status !== "Matched" && row.status !== "In 2B Only") continue
+    const b2b = resolveB2BForRow(row, map2B)
+    if (!b2b) continue
+    if (!isQRMPInvoice(b2b, recMonth, recYear)) continue
+    const supprd = (b2b.supprd ?? "").trim()
+    const totalITC = (b2b.igst ?? 0) + (b2b.cgst ?? 0) + (b2b.sgst ?? 0)
+    row.status = "QRMP Delay"
+    row.itcRisk = "Low"
+    row.isQRMP = true
+    row.qrmpNote =
+      "QRMP supplier with quarterly filing — invoice period differs from reconciliation period."
+    row.actionUrgency = "Monitor"
+    row.totalITCAtRisk = 0
+    row.recommendedAction =
+      `QRMP supplier detected. Invoice ${row.invoiceNumber} is from ${row.invoiceDate} but supplier ${row.supplierGSTIN} files quarterly (period: ${supprd}). Do NOT claim ${formatINR(totalITC)} ITC this month. Verify the correct quarter and claim when the invoice period matches your reconciliation period.`
+  }
+}
+
 export function checkIfQRMPFromSameSupplier(
   supplierGSTIN: string,
   rows2b: GSTR2BRow[],
@@ -322,7 +394,7 @@ function determineBaseRisk(
 ): ITCRiskLevel {
   void totalITCAtRisk
   if (itcAvailable === "N") return "Critical"
-  if (status === "QRMP Delay") return "Safe"
+  if (status === "QRMP Delay") return "Low"
   if (status === "In PR Only") return "High"
   if (status === "In 2B Only") return "High"
   if (status === "Value Mismatch") return "Medium"
@@ -336,7 +408,13 @@ function determineBaseRisk(
 }
 
 function maxRisk(a: ITCRiskLevel, b: ITCRiskLevel): ITCRiskLevel {
-  const o: Record<ITCRiskLevel, number> = { Safe: 0, Medium: 1, High: 2, Critical: 3 }
+  const o: Record<ITCRiskLevel, number> = {
+    Safe: 0,
+    Low: 1,
+    Medium: 2,
+    High: 3,
+    Critical: 4,
+  }
   return o[a] >= o[b] ? a : b
 }
 
@@ -401,8 +479,9 @@ function generateBaseAction(
     }
   }
 
-  if (status === "QRMP Delay" && pr) {
-    const expected = qrmpExpectedGstr2BMonthLabel(pr.invoiceDate)
+  if (status === "QRMP Delay") {
+    const invDate = (pr?.invoiceDate ?? b2b?.invoiceDate ?? "").trim()
+    const expected = qrmpExpectedGstr2BMonthLabel(invDate || (b2b?.invoiceDate ?? ""))
     return {
       action: `Supplier ${gstin} appears to file under the QRMP scheme (quarterly filing). This invoice is expected to appear in ${expected}'s GSTR-2B. No action needed — monitor next month.`,
       urgency: "Monitor",
@@ -853,6 +932,8 @@ export async function reconcileB2B(
     })
   }
 
+  applyCrossPeriodQrmpOverrides(results, map2B, recMonth, recYear)
+
   for (const r of results) {
     r.riskSortOrder = Math.round(computeListSortOrder(r))
   }
@@ -936,6 +1017,31 @@ function sumTaxPR(rows: ReconciliationRow[]): { igst: number; cgst: number; sgst
   return { igst: ig, cgst: cg, sgst: sg, total: ig + cg + sg }
 }
 
+/** QRMP deferred ITC: use PR when present, else GSTR-2B (e.g. former In 2B Only rows). */
+function sumTaxQrmpDeferred(rows: ReconciliationRow[]): {
+  igst: number
+  cgst: number
+  sgst: number
+  total: number
+} {
+  let ig = 0
+  let cg = 0
+  let sg = 0
+  for (const r of rows) {
+    const prTotal = (r.igstPR ?? 0) + (r.cgstPR ?? 0) + (r.sgstPR ?? 0)
+    if (prTotal > 0) {
+      ig += r.igstPR ?? 0
+      cg += r.cgstPR ?? 0
+      sg += r.sgstPR ?? 0
+    } else {
+      ig += r.igst2B ?? 0
+      cg += r.cgst2B ?? 0
+      sg += r.sgst2B ?? 0
+    }
+  }
+  return { igst: ig, cgst: cg, sgst: sg, total: ig + cg + sg }
+}
+
 export function calculateGSTR3BSummary(rows: ReconciliationRow[]): GSTR3BSummary {
   const eligibleRows = rows.filter((r) => r.status === "Matched" && r.itcAvailable === "Y")
   const ineligibleRows = rows.filter((r) => r.itcAvailable === "N")
@@ -945,7 +1051,7 @@ export function calculateGSTR3BSummary(rows: ReconciliationRow[]): GSTR3BSummary
   const e = sumTax2B(eligibleRows)
   const i = sumTax2B(ineligibleRows)
   const d = sumTaxPR(deferredRows)
-  const q = sumTaxPR(qrmpRows)
+  const q = sumTaxQrmpDeferred(qrmpRows)
 
   return {
     eligibleIGST: e.igst,

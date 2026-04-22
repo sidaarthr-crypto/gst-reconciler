@@ -23,7 +23,7 @@ export type ReconciliationResultStatusDb =
   | "Duplicate"
   | "RCM Invoice"
 
-export type ItcRiskDb = "Safe" | "Medium" | "High" | "Critical"
+export type ItcRiskDb = "Safe" | "Low" | "Medium" | "High" | "Critical"
 
 export type ActionUrgencyDb =
   | "Immediate"
