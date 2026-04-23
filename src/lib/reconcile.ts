@@ -23,18 +23,30 @@ import {
   validatePOS,
 } from "@/lib/utils"
 
-/** QRMP filing periods use return months 01, 04, 07, 10 (MMYYYY). */
+const GST_QUARTER_RETURN_START_MONTHS = [1, 4, 7, 10]
+
+function isGstQuarterReturnStartMonth(month: number): boolean {
+  return GST_QUARTER_RETURN_START_MONTHS.includes(month)
+}
+
+/**
+ * True when `supprd` is a standard quarter-start return month (01/04/07/10).
+ * Monthly filers in Jan/Apr/Jul/Oct use the same MM prefix — use
+ * {@link isQRMPInvoice} with reconciliation month/year for QRMP detection.
+ */
 export function isQRMPSupplier(supprd: string): boolean {
   if (!supprd || supprd.length < 6) return false
   const month = Number.parseInt(supprd.substring(0, 2), 10)
   if (!Number.isFinite(month)) return false
-  return [1, 4, 7, 10].includes(month)
+  return isGstQuarterReturnStartMonth(month)
 }
 
 /**
- * True when the supplier files under QRMP (quarterly `supprd`) and the invoice
- * belongs to a different calendar month/year than the CA's reconciliation period.
- * Same month/year as reconciliation → not flagged (claim timing is fine).
+ * True when the B2B row reflects a **quarterly** supplier return (`supprd`
+ * covers Jan–Mar / Apr–Jun / Jul–Sep / Oct–Dec) that does not match the CA's
+ * reconciliation month, and the invoice date falls inside that quarter.
+ * Example: recon April 2024 + `supprd` 012024 + invoice in Mar 2024 → QRMP.
+ * Monthly filing `042024` with recon April 2024 → not QRMP (same period).
  */
 export function isQRMPInvoice(
   b2bRow: GSTR2BRow,
@@ -44,21 +56,28 @@ export function isQRMPInvoice(
   const supprd = (b2bRow.supprd ?? "").trim()
   if (!supprd || supprd.length < 6) return false
 
-  const filingMonth = Number.parseInt(supprd.substring(0, 2), 10)
-  if (!Number.isFinite(filingMonth)) return false
+  const supprdMonth = Number.parseInt(supprd.substring(0, 2), 10)
+  const supprdYear = Number.parseInt(supprd.substring(2, 6), 10)
+  if (!Number.isFinite(supprdMonth) || !Number.isFinite(supprdYear)) return false
 
-  const isQuarterly = [1, 4, 7, 10].includes(filingMonth)
-  if (!isQuarterly) return false
+  if (supprdMonth === reconciliationMonth && supprdYear === reconciliationYear) {
+    return false
+  }
+
+  const isQuarterStart = isGstQuarterReturnStartMonth(supprdMonth)
+  if (!isQuarterStart) return false
 
   const id = parseInvoiceDateFlexible(b2bRow.invoiceDate ?? "")
   if (!id) return false
 
-  const invoiceMonth = id.getMonth() + 1
-  const invoiceYear = id.getFullYear()
+  const invMonth = id.getMonth() + 1
+  const invYear = id.getFullYear()
+  const quarterEnd = supprdMonth + 2
 
-  return (
-    invoiceMonth !== reconciliationMonth || invoiceYear !== reconciliationYear
-  )
+  const invoiceInQuarter =
+    invYear === supprdYear && invMonth >= supprdMonth && invMonth <= quarterEnd
+
+  return invoiceInQuarter
 }
 
 function resolveB2BForRow(row: ReconciliationRow, map2B: Map<string, GSTR2BRow>): GSTR2BRow | undefined {
@@ -88,30 +107,34 @@ function applyCrossPeriodQrmpOverrides(
     if (row.status !== "Matched" && row.status !== "In 2B Only") continue
     const b2b = resolveB2BForRow(row, map2B)
     if (!b2b) continue
+    if (b2b.itcAvailable === "N") continue
     if (!isQRMPInvoice(b2b, recMonth, recYear)) continue
-    const supprd = (b2b.supprd ?? "").trim()
     const totalITC = (b2b.igst ?? 0) + (b2b.cgst ?? 0) + (b2b.sgst ?? 0)
+    const invDate = (b2b.invoiceDate ?? row.invoiceDate ?? "").trim()
     row.status = "QRMP Delay"
     row.itcRisk = "Low"
     row.isQRMP = true
     row.qrmpNote =
-      "QRMP supplier with quarterly filing — invoice period differs from reconciliation period."
+      "QRMP supplier with quarterly filing — invoice appears under a prior quarter return period relative to this reconciliation month."
     row.actionUrgency = "Monitor"
     row.totalITCAtRisk = 0
     row.recommendedAction =
-      `QRMP supplier detected. Invoice ${row.invoiceNumber} is from ${row.invoiceDate} but supplier ${row.supplierGSTIN} files quarterly (period: ${supprd}). Do NOT claim ${formatINR(totalITC)} ITC this month. Verify the correct quarter and claim when the invoice period matches your reconciliation period.`
+      `QRMP supplier. Invoice from ${invDate} will appear in next quarter GSTR-2B. Do not claim ${formatINR(totalITC)} yet.`
   }
 }
 
 export function checkIfQRMPFromSameSupplier(
   supplierGSTIN: string,
   rows2b: GSTR2BRow[],
+  reconciliationMonth?: number,
+  reconciliationYear?: number,
 ): boolean {
+  if (reconciliationMonth == null || reconciliationYear == null) return false
   const norm = supplierGSTIN.trim()
   for (const r of rows2b) {
     if (r.supplierGSTIN.trim() !== norm) continue
-    const sp = (r.supprd ?? "").trim()
-    if (isQRMPSupplier(sp)) return true
+    if (r.itcAvailable === "N") continue
+    if (isQRMPInvoice(r, reconciliationMonth, reconciliationYear)) return true
   }
   return false
 }
@@ -815,7 +838,12 @@ export async function reconcileB2B(
     }
 
     if (status === "In PR Only" && pr) {
-      const fromSuprd = checkIfQRMPFromSameSupplier(pr.supplierGSTIN, gstr2bMain)
+      const fromSuprd = checkIfQRMPFromSameSupplier(
+        pr.supplierGSTIN,
+        gstr2bMain,
+        recMonth,
+        recYear,
+      )
       const timing =
         recMonth != null && recYear != null
           ? isLikelyTimingDelay(pr.invoiceDate, recMonth, recYear)
