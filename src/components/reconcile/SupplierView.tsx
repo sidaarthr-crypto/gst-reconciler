@@ -7,6 +7,7 @@ import { ActionBadge } from "@/components/reconcile/ActionBadge"
 import { RiskBadge } from "@/components/reconcile/RiskBadge"
 import { StatusBadge } from "@/components/reconcile/StatusBadge"
 import { EmptyState } from "@/components/reconcile/EmptyState"
+import { isSafeMatchedRow } from "@/lib/reconcile"
 import { cn, formatINR, generateVendorMessage } from "@/lib/utils"
 import type {
   ITCRiskLevel,
@@ -117,11 +118,11 @@ export function groupBySupplier(rows: ReconciliationRow[]): SupplierGroup[] {
 
     for (const r of invoices) {
       worstRisk = maxRisk(worstRisk, r.itcRisk)
-      if (r.status === "Matched") matchedCount += 1
+      if (isSafeMatchedRow(r)) matchedCount += 1
       if (r.status === "Value Mismatch" || r.status === "Tax Type Mismatch") mismatchCount += 1
       if (r.status === "In PR Only" || r.status === "In 2B Only") missingCount += 1
       if (r.itcRisk === "Critical") criticalCount += 1
-      if (r.status === "Matched") {
+      if (isSafeMatchedRow(r)) {
         itcSafe += (r.igst2B ?? 0) + (r.cgst2B ?? 0) + (r.sgst2B ?? 0)
       }
       itcAtRisk += r.totalITCAtRisk ?? 0
@@ -155,7 +156,7 @@ export function groupBySupplier(rows: ReconciliationRow[]): SupplierGroup[] {
 }
 
 function groupFullyClean(g: SupplierGroup): boolean {
-  return g.invoices.every((r) => r.status === "Matched" && r.itcRisk === "Safe")
+  return g.invoices.every((r) => isSafeMatchedRow(r))
 }
 
 function syntheticRowForRisk(level: ITCRiskLevel): ReconciliationRow {
@@ -289,15 +290,15 @@ function MiniInvoiceTable({
 
 export function SupplierView({
   rows,
-  activeFilter: _activeFilter,
+  activeFilters: _activeFilters,
   vendorMessage,
 }: {
   rows: ReconciliationRow[]
   /** Parent passes filtered rows; kept for API parity with filter-driven views. */
-  activeFilter: ReconciliationFilterId
+  activeFilters: ReconciliationFilterId[]
   vendorMessage?: VendorMessageContext
 }) {
-  void _activeFilter
+  void _activeFilters
   const groups = useMemo(() => groupBySupplier(rows), [rows])
   const [expandedGSTINs, setExpandedGSTINs] = useState<Set<string>>(() => new Set())
   const [showAllByGstin, setShowAllByGstin] = useState<Set<string>>(() => new Set())

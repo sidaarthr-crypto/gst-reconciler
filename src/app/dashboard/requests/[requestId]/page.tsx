@@ -10,7 +10,7 @@ import { ReconciliationTable } from "@/components/reconcile/ReconciliationTable"
 import { SummaryCards } from "@/components/reconcile/SummaryCards"
 import { Button } from "@/components/ui/button"
 import { exportReconciliationWorkbook } from "@/lib/export"
-import type { ReconciliationFilterId, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
+import type { ActionUrgency, ReconciliationFilterId, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
 import { useAuth } from "@/hooks/useAuth"
 import { calculateGSTR3BSummary } from "@/lib/reconcile"
 import { cn, getMonthName } from "@/lib/utils"
@@ -44,7 +44,8 @@ export default function RequestDetailPage() {
   const [session, setSession] = useState<SessionPayload | null>(null)
   const [results, setResults] = useState<ReconciliationRow[]>([])
   const [summary, setSummary] = useState<ReconciliationSummary | null>(null)
-  const [filter, setFilter] = useState<ReconciliationFilterId>("All")
+  const [activeFilters, setActiveFilters] = useState<ReconciliationFilterId[]>([])
+  const [activeUrgencies, setActiveUrgencies] = useState<ActionUrgency[]>([])
   const [exportBusy, setExportBusy] = useState(false)
   const [navigating, setNavigating] = useState(false)
 
@@ -87,14 +88,18 @@ export default function RequestDetailPage() {
     }
   }
 
-  const filtered =
-    filter === "All"
-      ? results
-      : filter === "DeadlineWarning"
-        ? results.filter((r) => r.isDeadlineWarning && !r.isDeadlineExpired)
-        : filter === "PosIssues"
-          ? results.filter((r) => r.isPOSMismatch)
-          : results.filter((r) => r.status === filter)
+  const filtered = useMemo(() => {
+    return results.filter((row) =>
+      (activeFilters.length === 0 ||
+        activeFilters.some((filter) => {
+          if (filter === "DeadlineWarning") return row.isDeadlineWarning && !row.isDeadlineExpired
+          if (filter === "PosIssues") return row.isPOSMismatch
+          if (filter === "All") return true
+          return row.status === filter
+        })) &&
+      (activeUrgencies.length === 0 || activeUrgencies.includes(row.actionUrgency)),
+    )
+  }, [activeFilters, activeUrgencies, results])
 
   const gstr3bSummary = useMemo(() => calculateGSTR3BSummary(results), [results])
 
@@ -285,7 +290,13 @@ export default function RequestDetailPage() {
           <ReconciliationTable
             rows={filtered}
             loading={false}
-            filterBar={{ results, active: filter, onChange: setFilter }}
+            filterBar={{
+              results,
+              activeFilters,
+              activeUrgencies,
+              onChange: setActiveFilters,
+              onUrgencyChange: setActiveUrgencies,
+            }}
             vendorMessage={{
               period: `${getMonthName(session.month)} ${session.year}`,
               caName:

@@ -9,6 +9,11 @@ export type MismatchStatus =
   | "QRMP Delay"
   | "Duplicate"
   | "RCM Invoice"
+  | "ITC Blocked"
+  | "ITC Temporary"
+  | "POS Mismatch"
+  | "CESS Mismatch"
+  | "Tax Rate Mismatch"
 
 export type ITCBlockReason = "permanent" | "conditional" | null
 
@@ -47,9 +52,12 @@ export interface GSTR2BRow {
   supplierName: string
   supplierFilingDate: string
   invoiceNumber: string
+  rawInvoiceNumber?: string
   invoiceType: string
   /** Supplier return period from GSTR-2B (`MMYYYY`; months 01, 04, 07, 10 = QRMP quarter starts). */
   supprd?: string
+  /** Same as `supprd` when the sheet column is labeled `supplierFilingPeriod` / filing period aliases. */
+  supplierFilingPeriod?: string
   invoiceDate: string
   invoiceValue: number
   placeOfSupply: string
@@ -68,6 +76,7 @@ export interface PurchaseRegisterRow {
   supplierGSTIN: string
   supplierName: string
   invoiceNumber: string
+  rawInvoiceNumber?: string
   invoiceDate: string
   taxableValue: number
   igst: number
@@ -117,6 +126,10 @@ export interface ReconciliationRow {
   isSuggestedMatch?: boolean
   matchConfidence?: number | null
   suggestedMatchReason?: string | null
+  rawInvoiceNumber2B?: string | null
+  rawInvoiceNumberPR?: string | null
+  normalisedInvoiceNumber2B?: string | null
+  normalisedInvoiceNumberPR?: string | null
 
   isDuplicate?: boolean
   duplicateOf?: string | null
@@ -156,12 +169,15 @@ export type VendorMessageContext = {
 
 export interface ReconciliationSummary {
   totalInvoices: number
+  /** Rows that are matched and safe to claim (status Matched + ITC risk Safe). */
   matchedCount: number
   valueMismatchCount: number
   in2BOnlyCount: number
   inPROnlyCount: number
   /** Invoices classified as QRMP quarterly filing delay (monitor only). */
   qrmpCount: number
+  /** Count of rows with ITC risk other than Safe, excluding QRMP deferrals. */
+  issuesFoundCount: number
   totalITCAtRisk: number
   totalITCSafe: number
   taxTypeMismatchCount: number

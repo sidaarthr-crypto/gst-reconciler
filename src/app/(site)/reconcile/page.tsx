@@ -1,9 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { AlertTriangle, ArrowRight, CalendarDays } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { AlertTriangle, ArrowRight, Building2, CalendarDays, Download, RefreshCw } from "lucide-react"
 
-import { ExportButton } from "@/components/reconcile/ExportButton"
 import { FileUpload } from "@/components/reconcile/FileUpload"
 import { GateModal } from "@/components/reconcile/GateModal"
 import { GuestPromoBanner } from "@/components/reconcile/GuestPromoBanner"
@@ -18,14 +18,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAppConfig } from "@/hooks/useAppConfig"
 import { useAuth } from "@/hooks/useAuth"
+import { exportReconciliationWorkbook } from "@/lib/export"
 import { useReconciliation } from "@/hooks/useReconciliation"
 import { calculateGSTR3BSummary } from "@/lib/reconcile"
 import { cn, getMonthName } from "@/lib/utils"
 
 export default function ReconcilePage() {
+  const router = useRouter()
   const { config, loading: configLoading } = useAppConfig()
   const { loading: authLoading, isAuthenticated, displayName } = useAuth()
   const [tryAgainBusy, setTryAgainBusy] = useState(false)
+  const [newReconLoading, setNewReconLoading] = useState(false)
+  const [exportBusy, setExportBusy] = useState(false)
   const {
     gstr2bParseResult,
     gstr2bRows,
@@ -34,7 +38,8 @@ export default function ReconcilePage() {
     summary,
     results,
     filteredResults,
-    activeFilter,
+    activeFilters,
+    activeUrgencies,
     month,
     year,
     setMonth,
@@ -47,6 +52,7 @@ export default function ReconcilePage() {
     runReconciliation,
     loadSampleData,
     setFilter,
+    setUrgencyFilter,
     reset,
     clearGstr2b,
     clearPr,
@@ -155,6 +161,29 @@ export default function ReconcilePage() {
 
   const gstr3bSummary = useMemo(() => calculateGSTR3BSummary(results), [results])
   const gstr3bPeriodLabel = `${getMonthName(month)} ${year}`
+  const periodLabel = `${getMonthName(month)} ${year}`
+  const recipientGSTIN = gstr2bParseResult?.recipientGSTIN
+  const customerLabel = gstr2bParseResult?.recipientName?.trim() || gstr2bParseResult?.recipientGSTIN
+
+  function onExport() {
+    if (!summary || !results.length || !requestId) return
+    setExportBusy(true)
+    window.setTimeout(() => {
+      try {
+        exportReconciliationWorkbook({
+          month,
+          year,
+          requestId,
+          gstr2bFilename: gstr2bParseResult?.filename ?? "",
+          prFilename: prParseResult?.filename ?? "",
+          summary,
+          rows: results,
+        })
+      } finally {
+        setExportBusy(false)
+      }
+    }, 0)
+  }
 
   if (authLoading) {
     return (
@@ -169,7 +198,7 @@ export default function ReconcilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 md:px-6">
+    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10 lg:px-8">
       {showGateModal ? <GateModal /> : null}
 
       {gstr2bFilePeriodMismatchVisible && gstr2bFilePeriod ? (
@@ -579,37 +608,92 @@ export default function ReconcilePage() {
           </div>
           <RequestIdBanner requestId={requestId} />
           {guestPromoVisible ? <GuestPromoBanner onDismiss={dismissGuestPromo} /> : null}
+          {results.length > 0 ? (
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0 space-y-3">
+                <h2 className="font-mono text-2xl font-bold text-brand-navy">{requestId}</h2>
+                <p className="text-sm text-slate-500">{periodLabel} — B2B reconciliation</p>
+                {recipientGSTIN && customerLabel ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/customers/${encodeURIComponent(recipientGSTIN)}`)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200"
+                  >
+                    <Building2 size={12} />
+                    {customerLabel}
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex w-full flex-col gap-3 md:w-auto md:items-end">
+                <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+                  <button
+                    type="button"
+                    disabled={newReconLoading}
+                    onClick={() => {
+                      setNewReconLoading(true)
+                      router.push("/reconcile")
+                    }}
+                    className={cn(
+                      "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700",
+                      newReconLoading && "cursor-not-allowed opacity-70",
+                    )}
+                  >
+                    {newReconLoading ? (
+                      <span
+                        className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent"
+                        aria-hidden
+                      />
+                    ) : (
+                      <RefreshCw size={16} aria-hidden />
+                    )}
+                    {newReconLoading ? "Starting..." : "New Reconciliation"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={exportBusy}
+                    onClick={() => onExport()}
+                    className={cn(
+                      "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
+                      exportBusy && "cursor-not-allowed opacity-70",
+                    )}
+                  >
+                    {exportBusy ? (
+                      <span
+                        className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+                        aria-hidden
+                      />
+                    ) : (
+                      <Download size={16} aria-hidden />
+                    )}
+                    {exportBusy ? "Generating..." : "Download Excel"}
+                  </button>
+                </div>
+                <p className="text-right text-xs text-slate-400">
+                  Start a new reconciliation for any client and period
+                </p>
+              </div>
+            </div>
+          ) : null}
           <SummaryCards summary={summary} results={results} />
           {results.length > 0 ? (
             <GSTR3BSummary summary={gstr3bSummary} period={gstr3bPeriodLabel} />
           ) : null}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 flex-1">
-              <ReconciliationTable
-                rows={filteredResults}
-                filterBar={{
-                  results,
-                  active: activeFilter,
-                  onChange: setFilter,
-                }}
-                vendorMessage={{
-                  period: `${getMonthName(month)} ${year}`,
-                  caName:
-                    isAuthenticated && displayName?.trim() ? displayName.trim() : undefined,
-                }}
-              />
-            </div>
-            <div className="shrink-0">
-              <ExportButton
-                month={month}
-                year={year}
-                requestId={requestId}
-                gstr2bFilename={gstr2bParseResult?.filename ?? ""}
-                prFilename={prParseResult?.filename ?? ""}
-                summary={summary}
-                rows={results}
-              />
-            </div>
+          <div className="min-w-0">
+            <ReconciliationTable
+              rows={filteredResults}
+              filterBar={{
+                results,
+                  activeFilters,
+                  activeUrgencies,
+                onChange: setFilter,
+                  onUrgencyChange: setUrgencyFilter,
+              }}
+              vendorMessage={{
+                period: `${getMonthName(month)} ${year}`,
+                caName:
+                  isAuthenticated && displayName?.trim() ? displayName.trim() : undefined,
+              }}
+            />
           </div>
         </div>
       ) : null}
@@ -672,33 +756,41 @@ export default function ReconcilePage() {
               {results.length > 0 ? (
                 <GSTR3BSummary summary={gstr3bSummary} period={gstr3bPeriodLabel} />
               ) : null}
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <ReconciliationTable
-                    rows={filteredResults}
-                    filterBar={{
-                      results,
-                      active: activeFilter,
-                      onChange: setFilter,
-                    }}
-                    vendorMessage={{
-                      period: `${getMonthName(month)} ${year}`,
-                      caName:
-                        isAuthenticated && displayName?.trim() ? displayName.trim() : undefined,
-                    }}
-                  />
-                </div>
-                <div className="shrink-0">
-                  <ExportButton
-                    month={month}
-                    year={year}
-                    requestId={requestId}
-                    gstr2bFilename={gstr2bParseResult?.filename ?? ""}
-                    prFilename={prParseResult?.filename ?? ""}
-                    summary={summary}
-                    rows={results}
-                  />
-                </div>
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  disabled={exportBusy}
+                  onClick={() => onExport()}
+                  className={cn(
+                    "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
+                    exportBusy && "cursor-not-allowed opacity-70",
+                  )}
+                >
+                  {exportBusy ? (
+                    <span
+                      className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+                      aria-hidden
+                    />
+                  ) : (
+                    <Download size={16} aria-hidden />
+                  )}
+                  {exportBusy ? "Generating..." : "Download Excel"}
+                </button>
+                <ReconciliationTable
+                  rows={filteredResults}
+                  filterBar={{
+                    results,
+                    activeFilters,
+                    onChange: setFilter,
+                    activeUrgencies,
+                    onUrgencyChange: setUrgencyFilter,
+                  }}
+                  vendorMessage={{
+                    period: `${getMonthName(month)} ${year}`,
+                    caName:
+                      isAuthenticated && displayName?.trim() ? displayName.trim() : undefined,
+                  }}
+                />
               </div>
             </div>
           ) : null}

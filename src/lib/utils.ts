@@ -321,39 +321,64 @@ export function parsePlaceOfSupplyState(pos: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+function getStateName(code: number): string {
+  const states: Record<number, string> = {
+    27: "Maharashtra",
+    29: "Karnataka",
+    33: "Tamil Nadu",
+  }
+  return states[code] ?? `State ${code}`
+}
+
 export function validatePOS(
   b2b: { supplierGSTIN: string; placeOfSupply: string; igst: number; cgst: number; sgst: number },
   recipientGSTIN: string | undefined,
 ): { hasMismatch: boolean; warning: string | null } {
-  if (!recipientGSTIN || recipientGSTIN.length < 2) {
-    return { hasMismatch: false, warning: null }
-  }
   const supplierState = Number.parseInt(b2b.supplierGSTIN.slice(0, 2), 10)
-  const recipientState = Number.parseInt(recipientGSTIN.slice(0, 2), 10)
+  const recipientState = recipientGSTIN ? Number.parseInt(recipientGSTIN.slice(0, 2), 10) : NaN
   const posState = parsePlaceOfSupplyState(b2b.placeOfSupply)
-  if (!Number.isFinite(supplierState) || !Number.isFinite(recipientState) || posState === null) {
+  if (!Number.isFinite(supplierState) || posState === null) {
     return { hasMismatch: false, warning: null }
   }
-  if (supplierState !== recipientState) {
-    if (b2b.igst === 0 && (b2b.cgst > 0 || b2b.sgst > 0)) {
-      return {
-        hasMismatch: true,
-        warning:
-          "POS mismatch: interstate supply (supplier vs recipient state) but CGST/SGST is charged instead of IGST. ITC credit type may be incorrect.",
-      }
-    }
-  } else {
-    if (b2b.igst > 0 && b2b.cgst === 0 && b2b.sgst === 0) {
-      return {
-        hasMismatch: true,
-        warning:
-          "POS mismatch: intrastate supply but IGST is charged instead of CGST+SGST. Verify Place of Supply with supplier.",
-      }
-    }
+
+  const isInterstateSupply = posState !== supplierState
+  const hasIGST = (b2b.igst ?? 0) > 1
+  const hasCGSTSGST = (b2b.cgst ?? 0) > 1 || (b2b.sgst ?? 0) > 1
+  const warnings: string[] = []
+
+  if (isInterstateSupply && !hasIGST && hasCGSTSGST) {
+    warnings.push(
+      `POS MISMATCH: Place of Supply is ${getStateName(posState)} (${posState}) but supplier is in ${getStateName(supplierState)} (${supplierState}). This is an interstate supply - IGST should be charged, not CGST+SGST.`,
+    )
+  }
+  if (!isInterstateSupply && hasIGST && !hasCGSTSGST) {
+    warnings.push(
+      `POS MISMATCH: Place of Supply is ${getStateName(posState)} (${posState}) which matches supplier state - intrastate supply. CGST+SGST should be charged, not IGST.`,
+    )
+  }
+  if (Number.isFinite(recipientState) && posState !== recipientState) {
+    warnings.push(
+      `Also: POS filed as ${posState} but expected ${recipientState} (${getStateName(recipientState)}) for B2B recipient state.`,
+    )
+  }
+
+  if (warnings.length > 0) {
+    return { hasMismatch: true, warning: warnings.join(" ") }
   }
   return { hasMismatch: false, warning: null }
 }
 
+/** Normalise stored rate to a percentage (e.g. 0.18 → 18, 18 → 18). */
+export function normalizeGstRatePercent(rate: number): number | null {
+  if (!Number.isFinite(rate) || rate <= 0) return null
+  if (rate > 0 && rate <= 1) return Math.round(rate * 1000) / 10
+  return Math.round(rate * 10) / 10
+}
+
+/**
+ * Effective GST % for PR: prefer explicit rate column; otherwise infer from
+ * IGST-only vs CGST+SGST so IGST+intra components are not double-counted.
+ */
 export function inferTaxRatePR(pr: {
   taxableValue: number
   igst: number
@@ -361,9 +386,19 @@ export function inferTaxRatePR(pr: {
   sgst: number
   taxRate?: number
 }): number | null {
-  if (pr.taxRate !== undefined && Number.isFinite(pr.taxRate)) return pr.taxRate
+  const explicit = normalizeGstRatePercent(pr.taxRate ?? NaN)
+  if (explicit !== null) return explicit
   if (pr.taxableValue <= 0) return null
-  const tax = pr.igst + pr.cgst + pr.sgst
-  return Math.round((tax / pr.taxableValue) * 1000) / 10
+  const ig = pr.igst
+  const intra = pr.cgst + pr.sgst
+  const eps = 1
+  if (ig >= eps && intra < eps) {
+    return Math.round((ig / pr.taxableValue) * 1000) / 10
+  }
+  if (intra >= eps && ig < eps) {
+    return Math.round((intra / pr.taxableValue) * 1000) / 10
+  }
+  const total = ig + intra
+  return Math.round((total / pr.taxableValue) * 1000) / 10
 }
 

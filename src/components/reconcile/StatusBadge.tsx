@@ -43,6 +43,26 @@ const map: Record<
     className:
       "border-violet-500/60 bg-transparent text-violet-900 hover:bg-violet-50",
   },
+  "ITC Blocked": {
+    className:
+      "border-red-700/70 bg-transparent text-red-900 hover:bg-red-50",
+  },
+  "ITC Temporary": {
+    className:
+      "border-amber-600/60 bg-transparent text-amber-900 hover:bg-amber-50",
+  },
+  "POS Mismatch": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-900 hover:bg-amber-50",
+  },
+  "CESS Mismatch": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-800 hover:bg-amber-50",
+  },
+  "Tax Rate Mismatch": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-900 hover:bg-amber-50",
+  },
 }
 
 export function StatusBadge({ status }: { status: MismatchStatus }) {

@@ -1,18 +1,17 @@
 "use client"
 
-import type { CSSProperties } from "react"
-import { useState } from "react"
-import { Copy, LayoutGrid, List } from "lucide-react"
+import { useEffect, useState } from "react"
+import { FileSearch, LayoutGrid, List } from "lucide-react"
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { EmptyState } from "@/components/reconcile/EmptyState"
-import { ActionBadge } from "@/components/reconcile/ActionBadge"
 import { FilterBar } from "@/components/reconcile/FilterBar"
+import { InvoiceDetailModal } from "@/components/reconcile/InvoiceDetailModal"
 import { RiskBadge } from "@/components/reconcile/RiskBadge"
 import { StatusBadge } from "@/components/reconcile/StatusBadge"
 import { SupplierView } from "@/components/reconcile/SupplierView"
-import { cn, formatDiff, formatINR, generateVendorMessage } from "@/lib/utils"
+import { cn, formatINR } from "@/lib/utils"
 import type {
+  ActionUrgency,
   ReconciliationFilterId,
   ReconciliationRow,
   VendorMessageContext,
@@ -22,117 +21,32 @@ export type { VendorMessageContext }
 
 export type ReconciliationTableFilterBarProps = {
   results: ReconciliationRow[]
-  active: ReconciliationFilterId
-  onChange: (next: ReconciliationFilterId) => void
+  activeFilters: ReconciliationFilterId[]
+  activeUrgencies: ActionUrgency[]
+  onChange: (next: ReconciliationFilterId[]) => void
+  onUrgencyChange: (next: ActionUrgency[]) => void
 }
 
-function itcBadge(v: string | null) {
-  if (!v) return <span className="text-muted-foreground">—</span>
-  const cls =
-    v === "Y"
-      ? "bg-emerald-100 text-emerald-800"
-      : v === "N"
-        ? "bg-red-100 text-red-800"
-        : "bg-amber-100 text-amber-900"
+function UrgencyBadge({ urgency }: { urgency: ReconciliationRow["actionUrgency"] }) {
+  if (!urgency || urgency === "None") return null
+  if (urgency === "Immediate") {
+    return (
+      <span className="inline-flex w-fit rounded border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">
+        Immediate
+      </span>
+    )
+  }
+  if (urgency === "Before Filing") {
+    return (
+      <span className="inline-flex w-fit rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+        Before Filing
+      </span>
+    )
+  }
   return (
-    <span className={cn("rounded px-1.5 py-0.5 text-xs font-semibold", cls)}>
-      {v}
+    <span className="inline-flex w-fit rounded border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+      Monitor
     </span>
-  )
-}
-
-function rowBgClass(row: ReconciliationRow) {
-  if (row.status === "Duplicate" || row.isDuplicate) return ""
-  if (row.status === "QRMP Delay") return "bg-[#F8FAFC]"
-  if (row.itcRisk === "Critical") return "bg-[#FFF8F8]"
-  if (row.itcRisk === "High") return "bg-[#FFFAF5]"
-  if (row.itcRisk === "Low") return "bg-sky-50/80"
-  return "bg-white"
-}
-
-function rowBgStyle(row: ReconciliationRow): CSSProperties | undefined {
-  if (row.status === "Duplicate" || row.isDuplicate) {
-    return {
-      backgroundImage:
-        "repeating-linear-gradient(45deg, #FEF2F2, #FEF2F2 4px, #FFF5F5 4px, #FFF5F5 8px)",
-    }
-  }
-  return undefined
-}
-
-function DeadlineCell({ row }: { row: ReconciliationRow }) {
-  if (row.itcClaimDeadline == null) {
-    return <span className="text-muted-foreground">—</span>
-  }
-  if (row.isDeadlineExpired) {
-    return (
-      <div className="leading-tight">
-        <div className="text-xs font-semibold text-[#DC2626]">EXPIRED</div>
-        <div className="text-xs text-[#DC2626]/90">{row.itcClaimDeadline}</div>
-        <div className="text-xs text-[#DC2626]/80">
-          ({Math.abs(row.daysToDeadline ?? 0)} days ago)
-        </div>
-      </div>
-    )
-  }
-  if (row.isDeadlineWarning && !row.isDeadlineExpired) {
-    return (
-      <div className="leading-tight">
-        <div className="text-xs font-semibold text-[#D97706]">
-          {(row.daysToDeadline ?? 0).toString()} days left
-        </div>
-        <div className="text-xs text-[#D97706]">{row.itcClaimDeadline}</div>
-      </div>
-    )
-  }
-  return (
-    <div className="leading-tight text-muted-foreground">
-      <div className="text-xs">{row.itcClaimDeadline}</div>
-      <div className="text-xs">({(row.daysToDeadline ?? 0).toString()} days)</div>
-    </div>
-  )
-}
-
-function CopyVendorMessageButton({
-  row,
-  vendorMessage,
-}: {
-  row: ReconciliationRow
-  vendorMessage?: VendorMessageContext
-}) {
-  const [copied, setCopied] = useState(false)
-  if (row.status === "Matched" || row.status === "QRMP Delay") return null
-
-  const period = vendorMessage?.period?.trim() || "the relevant return period"
-  const caName = vendorMessage?.caName
-
-  return (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex min-h-11 items-center gap-0.5 border-0 bg-transparent p-0 text-left text-xs font-medium transition-colors md:min-h-0",
-        copied ? "text-emerald-600" : "text-[#2563EB] hover:underline",
-      )}
-      onClick={async () => {
-        const text = generateVendorMessage(row, period, caName)
-        try {
-          await navigator.clipboard.writeText(text)
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 2000)
-        } catch {
-          // Clipboard may be unavailable (non-secure context, permissions).
-        }
-      }}
-    >
-      {copied ? (
-        "✓ Copied!"
-      ) : (
-        <>
-          <Copy className="h-3 w-3 shrink-0" aria-hidden />
-          Copy Message
-        </>
-      )}
-    </button>
   )
 }
 
@@ -143,210 +57,114 @@ function InvoiceTable({
   rows: ReconciliationRow[]
   vendorMessage?: VendorMessageContext
 }) {
-  const showDeadlineColumn = rows.some((r) => r.itcClaimDeadline != null)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const openModal = (index: number) => {
+    setSelectedIndex(index)
+    setModalOpen(true)
+  }
+
+  const navigate = (direction: "prev" | "next") => {
+    if (selectedIndex === null) return
+    const next = direction === "next" ? selectedIndex + 1 : selectedIndex - 1
+    if (next >= 0 && next < rows.length) setSelectedIndex(next)
+  }
+
+  useEffect(() => {
+    if (!modalOpen) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") navigate("next")
+      if (e.key === "ArrowLeft") navigate("prev")
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [modalOpen, selectedIndex, rows.length])
 
   return (
-    <div className="scroll-table-hint overflow-x-auto rounded-xl border border-border bg-white [-webkit-overflow-scrolling:touch]">
-      <table
-        className={cn(
-          "w-full border-collapse text-xs md:text-sm",
-          showDeadlineColumn ? "min-w-[2480px]" : "min-w-[2350px]",
-        )}
-      >
-        <thead className="sticky top-0 z-10 bg-surface-2 text-left text-xs font-medium text-brand-navy shadow-[0_1px_0_0_var(--color-border)]">
+    <div className="relative w-full overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 bg-white max-h-[400px] lg:max-h-[600px]">
+      <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
+        <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-500 uppercase [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]">
           <tr>
-            <th className="w-[80px] whitespace-nowrap px-2 py-2 md:static md:bg-transparent max-md:sticky max-md:left-0 max-md:z-30 max-md:bg-surface-2 max-md:shadow-[4px_0_12px_-6px_rgba(0,0,0,0.12)]">
-              Risk
-            </th>
-            <th className="w-[130px] px-2 py-2 md:static md:bg-transparent max-md:sticky max-md:left-[80px] max-md:z-30 max-md:bg-surface-2 max-md:shadow-[4px_0_12px_-6px_rgba(0,0,0,0.12)]">
-              Status
-            </th>
-            <th className="w-[160px] px-2 py-2">GSTIN</th>
-            <th className="w-[160px] px-2 py-2">Supplier</th>
-            <th className="w-[140px] px-2 py-2">Invoice No</th>
-            <th className="w-[100px] px-2 py-2">Date</th>
-            <th className="w-[60px] px-2 py-2">POS</th>
-            <th className="w-[120px] px-2 py-2 text-right">Taxable 2B</th>
-            <th className="w-[120px] px-2 py-2 text-right">Taxable PR</th>
-            <th className="w-[100px] px-2 py-2 text-right">Taxable Diff</th>
-            <th className="w-[100px] px-2 py-2 text-right">IGST 2B</th>
-            <th className="w-[100px] px-2 py-2 text-right">IGST PR</th>
-            <th className="w-[100px] px-2 py-2 text-right">CGST 2B</th>
-            <th className="w-[100px] px-2 py-2 text-right">CGST PR</th>
-            <th className="w-[100px] px-2 py-2 text-right">SGST 2B</th>
-            <th className="w-[100px] px-2 py-2 text-right">SGST PR</th>
-            <th className="w-[70px] px-2 py-2">ITC Avl</th>
-            <th className="w-[80px] px-2 py-2 text-center">Tax Type</th>
-            <th className="w-[120px] px-2 py-2 text-right">ITC At Risk</th>
-            {showDeadlineColumn ? (
-              <th className="w-[130px] px-2 py-2">
-                <Tooltip>
-                  <TooltipTrigger className="cursor-default border-0 bg-transparent p-0 text-left font-medium text-brand-navy">
-                    ITC Deadline
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">
-                    Last date to claim ITC under Section 16(4). Applies to invoices missing from
-                    GSTR-2B.
-                  </TooltipContent>
-                </Tooltip>
-              </th>
-            ) : null}
-            <th className="w-[250px] px-2 py-2">Recommended Action</th>
-            <th className="w-[120px] px-2 py-2">Urgency</th>
+            <th className="w-20 whitespace-nowrap px-3 py-3">Risk</th>
+            <th className="w-[140px] whitespace-nowrap px-3 py-3">Status</th>
+            <th className="w-[110px] whitespace-nowrap px-3 py-3">Urgency</th>
+            <th className="w-[170px] whitespace-nowrap px-3 py-3">Supplier</th>
+            <th className="w-[130px] whitespace-nowrap px-3 py-3">Invoice No</th>
+            <th className="w-[90px] whitespace-nowrap px-3 py-3">Invoice Date</th>
+            <th className="w-[110px] whitespace-nowrap px-3 py-3 text-right">ITC At Risk</th>
+            <th className="w-20 whitespace-nowrap px-3 py-3">Details</th>
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="py-12 text-center">
+                <FileSearch className="mx-auto mb-2 text-slate-300" size={32} />
+                <p className="text-sm text-slate-400">No invoices match this filter</p>
+              </td>
+            </tr>
+          ) : null}
           {rows.map((row, idx) => {
-            const td = formatDiff(row.taxableDiff)
-            const showTaxType = row.isTaxTypeMismatch || row.status === "Tax Type Mismatch"
-            const isDupRow = row.status === "Duplicate" || row.isDuplicate
-            const stickyCell = (extra?: string) =>
-              cn(
-                !isDupRow &&
-                  "max-md:sticky max-md:z-20 max-md:shadow-[4px_0_12px_-8px_rgba(0,0,0,0.08)]",
-                extra,
-              )
-            const deadlineTdClass = cn(
-              "w-[130px] px-2 py-2 align-top text-xs",
-              row.itcClaimDeadline != null &&
-                row.isDeadlineExpired &&
-                "bg-[#FEF2F2]",
-              row.itcClaimDeadline != null &&
-                row.isDeadlineWarning &&
-                !row.isDeadlineExpired &&
-                "bg-[#FFFBEB]",
-            )
             return (
               <tr
                 key={`${row.matchKey}-${row.invoiceNumber}-${idx}`}
                 className={cn(
-                  "border-t border-border transition-colors hover:bg-surface-2/80",
-                  rowBgClass(row),
+                  "h-14 border-b border-slate-100 transition-colors hover:bg-slate-50",
+                  idx % 2 === 1 && "bg-slate-50/30",
                 )}
-                style={rowBgStyle(row)}
               >
-                <td
-                  className={cn(
-                    "px-2 py-2 align-top",
-                    stickyCell("max-md:left-0"),
-                    !isDupRow && rowBgClass(row),
-                  )}
-                >
+                <td className="w-20 px-3 py-3 align-middle text-xs">
                   <RiskBadge row={row} />
                 </td>
-                <td
-                  className={cn(
-                    "px-2 py-2 align-top",
-                    stickyCell("max-md:left-[80px]"),
-                    !isDupRow && rowBgClass(row),
-                  )}
-                >
-                  <div className="flex flex-wrap items-center gap-1">
-                    <StatusBadge status={row.status} />
-                    {(row.isRCM || row.status === "RCM Invoice") && (
-                      <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold uppercase text-violet-800">
-                        RCM
-                      </span>
-                    )}
-                  </div>
+                <td className="w-[140px] px-3 py-3 align-middle text-xs">
+                  <StatusBadge status={row.status} />
                 </td>
-                <td className="px-2 py-2 font-mono text-xs align-top">{row.supplierGSTIN}</td>
-                <td className="max-w-[160px] truncate px-2 py-2 align-top" title={row.supplierName}>
-                  {row.supplierName}
-                </td>
-                <td className="px-2 py-2 font-mono text-xs align-top">{row.invoiceNumber}</td>
-                <td className="px-2 py-2 align-top">{row.invoiceDate}</td>
-                <td className="px-2 py-2 align-top">{row.placeOfSupply}</td>
-                <td className="px-2 py-2 text-right align-top tabular-nums">
-                  {formatINR(row.taxable2B)}
-                </td>
-                <td className="px-2 py-2 text-right align-top tabular-nums">
-                  {formatINR(row.taxablePR)}
+                <td className="w-[110px] px-3 py-3 align-middle text-xs">
+                  <UrgencyBadge urgency={row.actionUrgency} />
                 </td>
                 <td
-                  className={cn(
-                    "px-2 py-2 text-right align-top tabular-nums text-xs font-medium",
-                    td.isPositive && "text-emerald-700",
-                    td.isNegative && "text-red-700",
-                    !td.isPositive && !td.isNegative && "text-muted-foreground",
-                  )}
+                  className="w-[170px] px-3 py-3 align-middle"
+                  title={row.supplierName}
                 >
-                  {td.text}
+                  <p className="truncate text-sm font-medium text-slate-800">{row.supplierName}</p>
+                  <p className="truncate font-mono text-xs text-slate-400">{row.supplierGSTIN}</p>
                 </td>
-                <td className="px-2 py-2 text-right align-top tabular-nums text-xs">
-                  {formatINR(row.igst2B)}
+                <td className="w-[130px] px-3 py-3 align-middle font-mono text-xs truncate" title={row.invoiceNumber}>
+                  {row.invoiceNumber}
                 </td>
-                <td className="px-2 py-2 text-right align-top tabular-nums text-xs">
-                  {formatINR(row.igstPR)}
-                </td>
-                <td className="px-2 py-2 text-right align-top tabular-nums text-xs">
-                  {formatINR(row.cgst2B)}
-                </td>
-                <td className="px-2 py-2 text-right align-top tabular-nums text-xs">
-                  {formatINR(row.cgstPR)}
-                </td>
-                <td className="px-2 py-2 text-right align-top tabular-nums text-xs">
-                  {formatINR(row.sgst2B)}
-                </td>
-                <td className="px-2 py-2 text-right align-top tabular-nums text-xs">
-                  {formatINR(row.sgstPR)}
-                </td>
-                <td className="px-2 py-2 align-top">{itcBadge(row.itcAvailable)}</td>
-                <td className="px-2 py-2 align-top text-center text-xs">
-                  {showTaxType ? (
-                    <Tooltip>
-                      <TooltipTrigger className="cursor-default border-0 bg-transparent p-0 font-semibold text-amber-800">
-                        IGST↔CGST
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-xs">
-                        Total tax matches but tax type (IGST vs CGST/SGST) differs
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
+                <td className="w-[90px] px-3 py-3 align-middle text-xs">{row.invoiceDate}</td>
                 <td
                   className={cn(
-                    "px-2 py-2 text-right align-top tabular-nums font-semibold",
-                    row.totalITCAtRisk > 0 ? "text-risk-critical" : "text-muted-foreground",
+                    "w-[110px] px-3 py-3 align-middle text-right font-mono text-xs tabular-nums",
+                    row.totalITCAtRisk > 0 ? "font-semibold text-red-600" : "text-slate-400",
                   )}
                 >
-                  {formatINR(row.totalITCAtRisk)}
+                  {row.totalITCAtRisk > 0 ? formatINR(row.totalITCAtRisk) : "—"}
                 </td>
-                {showDeadlineColumn ? (
-                  <td className={deadlineTdClass}>
-                    <DeadlineCell row={row} />
-                  </td>
-                ) : null}
-                <td className="max-w-[250px] px-2 py-2 align-top">
-                  <div className="flex flex-col gap-1">
-                    <Tooltip>
-                      <TooltipTrigger className="block max-w-[250px] cursor-default truncate text-left text-xs text-brand-navy">
-                        <span className="inline-flex flex-wrap items-start gap-1.5">
-                          {row.status === "Suggested Match" && row.matchConfidence != null ? (
-                            <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900">
-                              {row.matchConfidence}% match
-                            </span>
-                          ) : null}
-                          <span>{row.recommendedAction}</span>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-sm text-xs">
-                        {row.recommendedAction}
-                      </TooltipContent>
-                    </Tooltip>
-                    <CopyVendorMessageButton row={row} vendorMessage={vendorMessage} />
-                  </div>
-                </td>
-                <td className="px-2 py-2 align-top">
-                  <ActionBadge urgency={row.actionUrgency} />
+                <td className="w-20 px-3 py-3 align-middle text-xs">
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    onClick={() => openModal(idx)}
+                  >
+                    Details →
+                  </button>
                 </td>
               </tr>
             )
           })}
         </tbody>
       </table>
+      <InvoiceDetailModal
+        row={selectedIndex !== null ? rows[selectedIndex] : null}
+        allRows={rows}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onNavigate={navigate}
+        currentIndex={selectedIndex ?? 0}
+        vendorMessage={vendorMessage}
+      />
     </div>
   )
 }
@@ -435,9 +253,11 @@ export function ReconciliationTable({
 
   const body =
     viewMode === "supplier" ? (
-      <SupplierView rows={rows} activeFilter={filterBar.active} vendorMessage={vendorMessage} />
-    ) : !rows.length ? (
-      emptyBlock
+      <SupplierView
+        rows={rows}
+        activeFilters={filterBar.activeFilters}
+        vendorMessage={vendorMessage}
+      />
     ) : (
       <InvoiceTable rows={rows} vendorMessage={vendorMessage} />
     )
@@ -448,8 +268,10 @@ export function ReconciliationTable({
         <div className="min-w-0 flex-1">
           <FilterBar
             results={filterBar.results}
-            active={filterBar.active}
+            activeFilters={filterBar.activeFilters}
+            activeUrgencies={filterBar.activeUrgencies}
             onChange={filterBar.onChange}
+            onUrgencyChange={filterBar.onUrgencyChange}
           />
         </div>
         <ViewModeToggle viewMode={viewMode} onViewMode={setViewMode} />

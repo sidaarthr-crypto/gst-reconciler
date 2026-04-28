@@ -17,6 +17,7 @@ import {
   samplePurchaseRows,
 } from "@/lib/sampleData"
 import type {
+  ActionUrgency,
   AppConfig,
   GSTR2BRow,
   ParseResult,
@@ -87,7 +88,8 @@ export function useReconciliation(
   const [results, setResults] = useState<ReconciliationRow[]>([])
   const [summary, setSummary] = useState<ReconciliationSummary | null>(null)
 
-  const [activeFilter, setFilter] = useState<ReconciliationFilterId>("All")
+  const [activeFilters, setFilter] = useState<ReconciliationFilterId[]>([])
+  const [activeUrgencies, setUrgencyFilter] = useState<ActionUrgency[]>([])
   const [month, setMonth] = useState(() => new Date().getMonth() + 1)
   const [year, setYear] = useState(() => new Date().getFullYear())
 
@@ -173,15 +175,20 @@ export function useReconciliation(
   }, [gstr2bRows.length, prRows.length, volumeMismatch.hasMismatch])
 
   const filteredResults = useMemo(() => {
-    if (activeFilter === "All") return results
-    if (activeFilter === "DeadlineWarning") {
-      return results.filter((r) => r.isDeadlineWarning && !r.isDeadlineExpired)
-    }
-    if (activeFilter === "PosIssues") {
-      return results.filter((r) => r.isPOSMismatch)
-    }
-    return results.filter((r) => r.status === activeFilter)
-  }, [results, activeFilter])
+    return results.filter((row) => {
+      const statusMatch =
+        activeFilters.length === 0 ||
+        activeFilters.some((filter) => {
+          if (filter === "DeadlineWarning") return row.isDeadlineWarning && !row.isDeadlineExpired
+          if (filter === "PosIssues") return row.isPOSMismatch
+          if (filter === "All") return true
+          return row.status === filter
+        })
+      const urgencyMatch =
+        activeUrgencies.length === 0 || activeUrgencies.includes(row.actionUrgency)
+      return statusMatch && urgencyMatch
+    })
+  }, [results, activeFilters, activeUrgencies])
 
   const handleGSTR2BFile = useCallback(
     async (file: File) => {
@@ -383,7 +390,8 @@ export function useReconciliation(
     setSession(null)
     setResults([])
     setSummary(null)
-    setFilter("All")
+    setFilter([])
+    setUrgencyFilter([])
     setPhase("idle")
     setError(null)
     setRequestId(null)
@@ -488,12 +496,18 @@ export function useReconciliation(
         )
       }
 
+      const selectedMonth = Number(month)
+      const selectedYear = Number(year)
+
       const { rows, summary: sum } = await reconcileB2B(
         gstr2bRows,
         prRows,
         config,
         gstr2bParseResult?.recipientGSTIN ?? undefined,
-        { month, year },
+        {
+          month: selectedMonth,
+          year: selectedYear,
+        },
       )
 
       setResults(rows)
@@ -587,7 +601,8 @@ export function useReconciliation(
     session,
     results,
     summary,
-    activeFilter,
+    activeFilters,
+    activeUrgencies,
     month,
     year,
     setMonth,
@@ -601,6 +616,7 @@ export function useReconciliation(
     runReconciliation,
     loadSampleData,
     setFilter,
+    setUrgencyFilter,
     reset,
     clearGstr2b,
     clearPr,

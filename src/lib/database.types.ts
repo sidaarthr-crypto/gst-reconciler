@@ -22,6 +22,11 @@ export type ReconciliationResultStatusDb =
   | "QRMP Delay"
   | "Duplicate"
   | "RCM Invoice"
+  | "ITC Blocked"
+  | "ITC Temporary"
+  | "POS Mismatch"
+  | "CESS Mismatch"
+  | "Tax Rate Mismatch"
 
 export type ItcRiskDb = "Safe" | "Low" | "Medium" | "High" | "Critical"
 

@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
+import { isReconciliationIssueRow } from "@/lib/reconcile"
 import { formatINR } from "@/lib/utils"
 import type { ReconciliationRow, ReconciliationSummary } from "@/lib/types"
 
@@ -33,13 +34,8 @@ export function SummaryCards({
     setDismissed((prev) => new Set(prev).add(k))
   }, [])
 
-  const vmAtRisk = useMemo(
-    () =>
-      results
-        .filter((r) => r.status === "Value Mismatch")
-        .reduce((s, r) => s + r.totalITCAtRisk, 0),
-    [results],
-  )
+  const issuesCount =
+    summary.issuesFoundCount ?? results.filter(isReconciliationIssueRow).length
 
   const expiredCount = useMemo(
     () => results.filter((r) => r.isDeadlineExpired).length,
@@ -62,7 +58,9 @@ export function SummaryCards({
     return nearest.itcClaimDeadline
   }, [results])
 
-  const missingOnly = summary.in2BOnlyCount + summary.inPROnlyCount
+  const in2BOnlyDisplay = results.filter((r) => r.status === "In 2B Only").length
+  const inPROnlyDisplay = results.filter((r) => r.status === "In PR Only").length
+  const missingOnly = in2BOnlyDisplay + inPROnlyDisplay
 
   const showDup = summary.duplicateCount > 0 && !dismissed.has("dup")
   const showTaxType = summary.taxTypeMismatchCount > 0 && !dismissed.has("taxType")
@@ -102,11 +100,10 @@ export function SummaryCards({
           <CardContent className="flex gap-4 p-5">
             <AlertTriangle className="h-8 w-8 shrink-0 text-risk-medium" aria-hidden />
             <div>
-              <p className="text-4xl font-semibold text-risk-medium">
-                {summary.valueMismatchCount}
-              </p>
+              <p className="text-4xl font-semibold text-risk-medium">{issuesCount}</p>
+              <p className="text-sm text-muted-foreground">Issues Found</p>
               <p className="text-sm text-risk-medium">
-                {formatINR(vmAtRisk)} at risk
+                {formatINR(summary.totalITCAtRisk)} at risk
               </p>
             </div>
           </CardContent>
@@ -118,8 +115,7 @@ export function SummaryCards({
             <div>
               <p className="text-4xl font-semibold text-risk-high">{missingOnly}</p>
               <p className="text-xs text-muted-foreground">
-                2B only: {summary.in2BOnlyCount} &nbsp;|&nbsp; PR only:{" "}
-                {summary.inPROnlyCount}
+                2B only: {in2BOnlyDisplay} &nbsp;|&nbsp; PR only: {inPROnlyDisplay}
               </p>
             </div>
           </CardContent>

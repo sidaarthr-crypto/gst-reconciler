@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import type { Database } from "@/lib/database.types"
 import type { GSTR2BRow, PurchaseRegisterRow, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
+import { buildReconciliationSummary } from "@/lib/reconcile"
 import { supabase } from "@/lib/supabase"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { makeMatchKey, normaliseGSTIN, normaliseInvoiceNo } from "@/lib/utils"
@@ -30,7 +31,8 @@ function mapGstr2bRow(
     supplier_gstin: row.supplierGSTIN,
     supplier_name: row.supplierName || null,
     supplier_filing_date: row.supplierFilingDate || null,
-    supplier_period: row.supprd?.trim() || null,
+    supplier_period:
+      row.supplierFilingPeriod?.trim() || row.supprd?.trim() || null,
     invoice_number: row.invoiceNumber,
     invoice_type: row.invoiceType || null,
     invoice_date: row.invoiceDate || null,
@@ -207,26 +209,31 @@ function mapDbResult(row: {
   }
 }
 
-function summaryFromResults(rows: ReconciliationRow[]): ReconciliationSummary {
+/** Prefer totals persisted at save-time so dashboard matches reconcile page (no client-only fields in DB rows). */
+function mergeSessionSummaryTotals(
+  session: {
+    total_invoices: number | null
+    matched_count: number | null
+    mismatch_count: number | null
+    total_itc_at_risk: string | null
+    total_itc_safe: string | null
+  },
+  computed: ReconciliationSummary,
+): ReconciliationSummary {
+  const parseMoney = (v: string | null | undefined): number | undefined => {
+    if (v === null || v === undefined || v === "") return undefined
+    const n = Number(v)
+    return Number.isFinite(n) ? n : undefined
+  }
+  const itcRisk = parseMoney(session.total_itc_at_risk)
+  const itcSafe = parseMoney(session.total_itc_safe)
   return {
-    totalInvoices: rows.length,
-    matchedCount: rows.filter((r) => r.status === "Matched").length,
-    valueMismatchCount: rows.filter((r) => r.status === "Value Mismatch").length,
-    in2BOnlyCount: rows.filter((r) => r.status === "In 2B Only").length,
-    inPROnlyCount: rows.filter((r) => r.status === "In PR Only").length,
-    qrmpCount: rows.filter((r) => r.status === "QRMP Delay").length,
-    totalITCAtRisk: rows.reduce((s, r) => s + r.totalITCAtRisk, 0),
-    totalITCSafe: rows
-      .filter((r) => r.status === "Matched")
-      .reduce((s, r) => s + (r.igst2B ?? 0) + (r.cgst2B ?? 0) + (r.sgst2B ?? 0), 0),
-    taxTypeMismatchCount: rows.filter((r) => r.status === "Tax Type Mismatch").length,
-    suggestedMatchCount: rows.filter((r) => r.status === "Suggested Match").length,
-    duplicateCount: rows.filter((r) => r.status === "Duplicate").length,
-    rcmInvoiceCount: rows.filter((r) => r.status === "RCM Invoice").length,
-    deadlineExpiredCount: rows.filter((r) => r.isDeadlineExpired).length,
-    deadlineWarningCount: rows.filter((r) => r.isDeadlineWarning && !r.isDeadlineExpired).length,
-    posMismatchCount: rows.filter((r) => r.isPOSMismatch).length,
-    totalCESSAtRisk: rows.reduce((s, r) => s + Math.abs(r.cessDiff ?? 0), 0),
+    ...computed,
+    ...(session.total_invoices != null ? { totalInvoices: session.total_invoices } : {}),
+    ...(session.matched_count != null ? { matchedCount: session.matched_count } : {}),
+    ...(session.mismatch_count != null ? { issuesFoundCount: session.mismatch_count } : {}),
+    ...(itcRisk !== undefined ? { totalITCAtRisk: itcRisk } : {}),
+    ...(itcSafe !== undefined ? { totalITCSafe: itcSafe } : {}),
   }
 }
 
@@ -281,7 +288,8 @@ export async function GET(
     }
 
     const mappedResults = (results ?? []).map(mapDbResult)
-    const summary = summaryFromResults(mappedResults)
+    const computedSummary = buildReconciliationSummary(mappedResults)
+    const summary = mergeSessionSummaryTotals(session, computedSummary)
 
     const sessionPayload = {
       id: session.id,
@@ -349,7 +357,7 @@ export async function POST(
         completed_at: new Date().toISOString(),
         total_invoices: body.summary.totalInvoices,
         matched_count: body.summary.matchedCount,
-        mismatch_count: body.summary.valueMismatchCount,
+        mismatch_count: body.summary.issuesFoundCount,
         in_2b_only_count: body.summary.in2BOnlyCount,
         in_pr_only_count: body.summary.inPROnlyCount,
         total_itc_at_risk: String(body.summary.totalITCAtRisk),

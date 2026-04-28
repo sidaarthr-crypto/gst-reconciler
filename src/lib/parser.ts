@@ -479,7 +479,23 @@ const GSTR2B_ALIASES = {
     required: false,
   },
   supprd: {
-    aliases: ["supprd", "supplier period", "supplier return period", "ret period", "tax period"],
+    aliases: [
+      "supprd",
+      "filing period",
+      "filing period (supprd)",
+      "supp filing period",
+      "supplier filing period",
+      "return period",
+      "fil period",
+      "supplier return period",
+      "supplier period",
+      "ret period",
+      "tax period",
+      "return period of supplier",
+      "filing return period",
+      "sup filing period",
+      /* Do not add supfildt here — that maps supplier filing *date*, not period (MMYYYY). */
+    ],
     label: "Supplier Return Period",
     examples: "supprd, 042024",
     required: false,
@@ -599,6 +615,12 @@ const PR_ALIASES = {
     aliases: ["hsn", "hsn code", "hsn/sac", "sac", "hsn sac", "commodity code"],
     label: "HSN Code",
     examples: "hsn, hsn code",
+    required: false,
+  },
+  taxRate: {
+    aliases: ["rate", "tax rate", "gst rate", "rate of tax", "gst %", "tax %"],
+    label: "Tax Rate",
+    examples: "rate, tax rate",
     required: false,
   },
 } as const
@@ -1011,7 +1033,8 @@ export async function parseGSTR2BFile(
   const rows: GSTR2BRow[] = []
   for (const r of rawRows) {
     const supplierGSTIN = String(getCell(r, col.supplierGSTIN) ?? "").trim()
-    const invoiceNumber = String(getCell(r, col.invoiceNumber) ?? "").trim()
+    const rawInvoiceNumber = String(getCell(r, col.invoiceNumber) ?? "").trim()
+    const invoiceNumber = rawInvoiceNumber
     if (!supplierGSTIN || supplierGSTIN === "-") continue
     if (!invoiceNumber || invoiceNumber === "-") continue
 
@@ -1033,11 +1056,16 @@ export async function parseGSTR2BFile(
       supplierGSTIN,
       supplierName: String(getCell(r, col.supplierName) ?? "").trim(),
       supplierFilingDate: String(getCell(r, col.supplierFilingDate) ?? "").trim(),
-      supprd: (() => {
-        const s = col.supprd ? String(getCell(r, col.supprd) ?? "").trim() : ""
-        return s || undefined
+      ...(() => {
+        const filingPeriodRaw = col.supprd ? String(getCell(r, col.supprd) ?? "").trim() : ""
+        const filingPeriod = filingPeriodRaw || undefined
+        return {
+          supprd: filingPeriod,
+          supplierFilingPeriod: filingPeriod,
+        }
       })(),
       invoiceNumber,
+      rawInvoiceNumber,
       invoiceType: String(getCell(r, col.invoiceType) ?? "").trim() || "B2B",
       invoiceDate: String(getCell(r, col.invoiceDate) ?? "").trim(),
       invoiceValue: parseNumber(getCell(r, col.invoiceValue)),
@@ -1209,12 +1237,20 @@ export async function parsePurchaseRegisterFile(
       PR_ALIASES.hsnCode.examples,
       false,
     ),
+    taxRate: findColumn(
+      headers,
+      [...PR_ALIASES.taxRate.aliases],
+      PR_ALIASES.taxRate.label,
+      PR_ALIASES.taxRate.examples,
+      false,
+    ),
   }
 
   const rows: PurchaseRegisterRow[] = []
   for (const r of rawRows) {
     const supplierGSTIN = String(getCell(r, col.supplierGSTIN) ?? "").trim()
-    const invoiceNumber = String(getCell(r, col.invoiceNumber) ?? "").trim()
+    const rawInvoiceNumber = String(getCell(r, col.invoiceNumber) ?? "").trim()
+    const invoiceNumber = rawInvoiceNumber
     if (!supplierGSTIN || supplierGSTIN === "-") continue
     if (!invoiceNumber || invoiceNumber === "-") continue
 
@@ -1240,10 +1276,14 @@ export async function parsePurchaseRegisterFile(
     const totalInvoiceValue =
       totalFromCol > 0 ? totalFromCol : taxableValue + igst + cgst + sgst + cess
 
+    const taxRateCell = col.taxRate ? parseNumber(getCell(r, col.taxRate)) : NaN
+    const taxRate = Number.isFinite(taxRateCell) && taxRateCell > 0 ? taxRateCell : undefined
+
     rows.push({
       supplierGSTIN,
       supplierName: String(getCell(r, col.supplierName) ?? "").trim(),
       invoiceNumber,
+      rawInvoiceNumber,
       invoiceDate: String(getCell(r, col.invoiceDate) ?? "").trim(),
       taxableValue,
       igst,
@@ -1253,6 +1293,7 @@ export async function parsePurchaseRegisterFile(
       totalInvoiceValue,
       placeOfSupply: String(getCell(r, col.placeOfSupply) ?? "").trim() || undefined,
       hsnCode: String(getCell(r, col.hsnCode) ?? "").trim() || undefined,
+      ...(taxRate !== undefined ? { taxRate } : {}),
     })
   }
 

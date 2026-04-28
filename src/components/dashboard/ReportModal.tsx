@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/useAuth"
 import { exportReconciliationWorkbook } from "@/lib/export"
 import { getMonthName } from "@/lib/utils"
-import type { ReconciliationFilterId, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
+import { isReconciliationIssueRow } from "@/lib/reconcile"
+import type { ActionUrgency, ReconciliationFilterId, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
 
 type SessionPayload = {
   id: string
@@ -38,7 +39,8 @@ export function ReportModal({
   const [session, setSession] = useState<SessionPayload | null>(null)
   const [results, setResults] = useState<ReconciliationRow[]>([])
   const [summary, setSummary] = useState<ReconciliationSummary | null>(null)
-  const [filter, setFilter] = useState<ReconciliationFilterId>("All")
+  const [activeFilters, setActiveFilters] = useState<ReconciliationFilterId[]>([])
+  const [activeUrgencies, setActiveUrgencies] = useState<ActionUrgency[]>([])
   const [exportBusy, setExportBusy] = useState(false)
 
   useEffect(() => {
@@ -78,15 +80,17 @@ export function ReportModal({
   }, [sessionId])
 
   const filtered = useMemo(() => {
-    if (filter === "All") return results
-    if (filter === "DeadlineWarning") {
-      return results.filter((r) => r.isDeadlineWarning && !r.isDeadlineExpired)
-    }
-    if (filter === "PosIssues") {
-      return results.filter((r) => r.isPOSMismatch)
-    }
-    return results.filter((r) => r.status === filter)
-  }, [results, filter])
+    return results.filter((row) =>
+      (activeFilters.length === 0 ||
+        activeFilters.some((filter) => {
+          if (filter === "DeadlineWarning") return row.isDeadlineWarning && !row.isDeadlineExpired
+          if (filter === "PosIssues") return row.isPOSMismatch
+          if (filter === "All") return true
+          return row.status === filter
+        })) &&
+      (activeUrgencies.length === 0 || activeUrgencies.includes(row.actionUrgency)),
+    )
+  }, [activeFilters, activeUrgencies, results])
 
   function onDownload() {
     if (!session || !summary || !results.length) return
@@ -169,11 +173,10 @@ export function ReportModal({
                     { label: "Total", value: summary.totalInvoices },
                     { label: "Matched", value: summary.matchedCount },
                     {
-                      label: "Mismatches",
+                      label: "Issues Found",
                       value:
-                        (summary.valueMismatchCount ?? 0) +
-                        (summary.in2BOnlyCount ?? 0) +
-                        (summary.inPROnlyCount ?? 0),
+                        summary.issuesFoundCount ??
+                        results.filter(isReconciliationIssueRow).length,
                     },
                     { label: "ITC at risk", value: summary.totalITCAtRisk, money: true },
                   ].map((c) => (
@@ -200,7 +203,13 @@ export function ReportModal({
                 <ReconciliationTable
                   rows={filtered}
                   loading={loading}
-                  filterBar={{ results, active: filter, onChange: setFilter }}
+                  filterBar={{
+                    results,
+                    activeFilters,
+                    activeUrgencies,
+                    onChange: setActiveFilters,
+                    onUrgencyChange: setActiveUrgencies,
+                  }}
                   vendorMessage={
                     session
                       ? {

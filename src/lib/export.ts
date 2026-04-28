@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx"
 
 import type { ReconciliationRow, ReconciliationSummary } from "@/lib/types"
-import { getMonthName } from "@/lib/utils"
+import { getITCDeadlineInfo, getMonthName } from "@/lib/utils"
 
 const HEADER_BG = "0F1629"
 const HEADER_FG = "FFFFFF"
@@ -37,24 +37,37 @@ function applyRowStyle(ws: XLSX.WorkSheet, rowIdx0: number, risk: string, colCou
   }
 }
 
-function deadlineExportCellValue(row: ReconciliationRow): string {
-  if (row.itcClaimDeadline == null) return "N/A"
-  if (row.isDeadlineExpired) return `EXPIRED - ${row.itcClaimDeadline}`
-  if (row.isDeadlineWarning && !row.isDeadlineExpired) {
+/** ITC Deadline (Sec 16(4)) column text — never "N/A" for expired rows when invoice date exists. */
+function formatDeadlineForExport(row: ReconciliationRow): string {
+  if (row.isDeadlineExpired) {
+    const fromRow = row.itcClaimDeadline?.trim()
+    const fromInv =
+      !fromRow && row.invoiceDate?.trim()
+        ? getITCDeadlineInfo(row.invoiceDate.trim())?.deadlineStr
+        : null
+    const label = fromRow || fromInv
+    return label ? `EXPIRED - ${label}` : "EXPIRED"
+  }
+  if (row.isDeadlineWarning && !row.isDeadlineExpired && row.itcClaimDeadline) {
     return `${row.daysToDeadline ?? 0} days - ${row.itcClaimDeadline}`
   }
-  return `${row.itcClaimDeadline} (${row.daysToDeadline ?? 0} days)`
+  if (row.itcClaimDeadline) {
+    return `${row.itcClaimDeadline} (${row.daysToDeadline ?? 0} days)`
+  }
+  return "N/A"
 }
 
-function deadlineCellExportStyle(row: ReconciliationRow) {
+/** Deadline column fill follows row risk; font is red (expired) or amber (warning). */
+function deadlineColumnCellStyle(row: ReconciliationRow) {
   const palette = RISK_STYLES[row.itcRisk] ?? RISK_STYLES.Medium
-  let font = palette.font
-  if (row.itcClaimDeadline != null) {
-    if (row.isDeadlineExpired) font = "DC2626"
-    else if (row.isDeadlineWarning && !row.isDeadlineExpired) font = "D97706"
-    else font = "000000"
+  let fontRgb = "FF000000"
+  if (row.isDeadlineExpired) fontRgb = "FFDC2626"
+  else if (row.isDeadlineWarning && !row.isDeadlineExpired && row.itcClaimDeadline)
+    fontRgb = "FFD97706"
+  return {
+    fill: { patternType: "solid" as const, fgColor: { rgb: palette.fill } },
+    font: { bold: true, color: { rgb: fontRgb } },
   }
-  return styleCell(palette.fill, font)
 }
 
 const REPORT_HEADERS = [
@@ -119,7 +132,7 @@ export function exportReconciliationWorkbook(params: {
     r.sgstPR ?? "",
     r.itcAvailable ?? "",
     r.totalITCAtRisk,
-    deadlineExportCellValue(r),
+    formatDeadlineForExport(r),
     r.recommendedAction,
     r.actionUrgency,
   ])
@@ -141,7 +154,7 @@ export function exportReconciliationWorkbook(params: {
     const dAddr = XLSX.utils.encode_cell({ r: i + 1, c: DEADLINE_COL_INDEX })
     const dCell = ws[dAddr] as XLSX.CellObject | undefined
     if (dCell) {
-      dCell.s = deadlineCellExportStyle(rows[i])
+      dCell.s = deadlineColumnCellStyle(rows[i])
     }
   }
 

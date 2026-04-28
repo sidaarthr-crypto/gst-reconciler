@@ -18,7 +18,9 @@ import {
   getRiskSortOrder,
   getStatusSortPriority,
   inferTaxRatePR,
+  normalizeGstRatePercent,
   makeMatchKey,
+  normaliseInvoiceNo,
   parseInvoiceDateFlexible,
   validatePOS,
 } from "@/lib/utils"
@@ -29,55 +31,69 @@ function isGstQuarterReturnStartMonth(month: number): boolean {
   return GST_QUARTER_RETURN_START_MONTHS.includes(month)
 }
 
+function normalizeSupprdDigits(supprd: string): string {
+  return supprd.replace(/[^0-9]/g, "")
+}
+
+/** Coerce UI/API period so `10 === reconciliationMonth` is never broken by string `"10"`. */
+function normalizeReconciliationPeriod(
+  period?: { month: number; year: number },
+): { month: number; year: number } | undefined {
+  if (!period) return undefined
+  const month = Number.parseInt(String(period.month), 10)
+  const year = Number.parseInt(String(period.year), 10)
+  if (!Number.isFinite(month) || !Number.isFinite(year)) return undefined
+  return { month, year }
+}
+
+/** GSTR-2B filing period (`supprd`): column may map to `supplierFilingPeriod` or `supprd`. */
+function getGstr2bSupprdRaw(b2bRow: GSTR2BRow): string {
+  const raw = b2bRow.supplierFilingPeriod ?? b2bRow.supprd
+  if (raw === undefined || raw === null) return ""
+  return String(raw).trim()
+}
+
 /**
  * True when `supprd` is a standard quarter-start return month (01/04/07/10).
  * Monthly filers in Jan/Apr/Jul/Oct use the same MM prefix — use
  * {@link isQRMPInvoice} with reconciliation month/year for QRMP detection.
  */
 export function isQRMPSupplier(supprd: string): boolean {
-  if (!supprd || supprd.length < 6) return false
-  const month = Number.parseInt(supprd.substring(0, 2), 10)
+  const clean = normalizeSupprdDigits((supprd ?? "").trim())
+  if (clean.length < 6) return false
+  const month = Number.parseInt(clean.substring(0, 2), 10)
   if (!Number.isFinite(month)) return false
   return isGstQuarterReturnStartMonth(month)
 }
 
 /**
- * True when the B2B row reflects a **quarterly** supplier return (`supprd`
- * covers Jan–Mar / Apr–Jun / Jul–Sep / Oct–Dec) that does not match the CA's
- * reconciliation month, and the invoice date falls inside that quarter.
- * Example: recon April 2024 + `supprd` 012024 + invoice in Mar 2024 → QRMP.
- * Monthly filing `042024` with recon April 2024 → not QRMP (same period).
+ * QRMP: quarterly filing period (`supprd` month 01/04/07/10) differs from the
+ * reconciliation month/year. Invoice date is not required — trust `supprd`.
  */
 export function isQRMPInvoice(
   b2bRow: GSTR2BRow,
   reconciliationMonth: number,
   reconciliationYear: number,
 ): boolean {
-  const supprd = (b2bRow.supprd ?? "").trim()
-  if (!supprd || supprd.length < 6) return false
+  const supprd = b2bRow.supplierFilingPeriod ?? b2bRow.supprd
+  if (!supprd) return false
 
-  const supprdMonth = Number.parseInt(supprd.substring(0, 2), 10)
-  const supprdYear = Number.parseInt(supprd.substring(2, 6), 10)
-  if (!Number.isFinite(supprdMonth) || !Number.isFinite(supprdYear)) return false
+  const clean = String(supprd).replace(/[^0-9]/g, "")
+  if (clean.length < 6) return false
 
-  if (supprdMonth === reconciliationMonth && supprdYear === reconciliationYear) {
-    return false
-  }
+  const sm = Number.parseInt(clean.substring(0, 2), 10)
+  const sy = Number.parseInt(clean.substring(2, 6), 10)
+  if (Number.isNaN(sm) || Number.isNaN(sy)) return false
 
-  const isQuarterStart = isGstQuarterReturnStartMonth(supprdMonth)
-  if (!isQuarterStart) return false
+  const rm = Number(reconciliationMonth)
+  const ry = Number(reconciliationYear)
+  if (!Number.isFinite(rm) || !Number.isFinite(ry)) return false
 
-  const id = parseInvoiceDateFlexible(b2bRow.invoiceDate ?? "")
-  if (!id) return false
+  if (sm === rm && sy === ry) return false
 
-  const invMonth = id.getMonth() + 1
-  const invYear = id.getFullYear()
-  const quarterEnd = supprdMonth + 2
+  if (![1, 4, 7, 10].includes(sm)) return false
 
-  const invoiceInQuarter =
-    invYear === supprdYear && invMonth >= supprdMonth && invMonth <= quarterEnd
-
-  return invoiceInQuarter
+  return true
 }
 
 function resolveB2BForRow(row: ReconciliationRow, map2B: Map<string, GSTR2BRow>): GSTR2BRow | undefined {
@@ -103,23 +119,49 @@ function applyCrossPeriodQrmpOverrides(
   recYear: number | undefined,
 ): void {
   if (recMonth == null || recYear == null) return
+  const rm = Number(recMonth)
+  const ry = Number(recYear)
+
   for (const row of results) {
     if (row.status !== "Matched" && row.status !== "In 2B Only") continue
-    const b2b = resolveB2BForRow(row, map2B)
+
+    const b2b = map2B.get(row.matchKey) ?? resolveB2BForRow(row, map2B)
     if (!b2b) continue
     if (b2b.itcAvailable === "N") continue
-    if (!isQRMPInvoice(b2b, recMonth, recYear)) continue
-    const totalITC = (b2b.igst ?? 0) + (b2b.cgst ?? 0) + (b2b.sgst ?? 0)
-    const invDate = (b2b.invoiceDate ?? row.invoiceDate ?? "").trim()
+
+    const invB2b = String(b2b.invoiceDate ?? "").trim()
+    const effectiveInvoiceDate = invB2b || String(row.invoiceDate ?? "").trim()
+
+    const b2bRow: GSTR2BRow =
+      invB2b === "" && effectiveInvoiceDate !== ""
+        ? { ...b2b, invoiceDate: effectiveInvoiceDate }
+        : b2b
+
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console -- QRMP call-site diagnostics
+      console.log("About to QRMP check:", {
+        invoice: row.invoiceNumber,
+        currentStatus: row.status,
+        willCheck: row.status === "Matched" || row.status === "In 2B Only",
+      })
+    }
+
+    const qrmp = isQRMPInvoice(b2bRow, rm, ry)
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console -- QRMP call-site diagnostics
+      console.log("QRMP result for", row.invoiceNumber, ":", qrmp)
+    }
+    if (!qrmp) continue
+
     row.status = "QRMP Delay"
     row.itcRisk = "Low"
     row.isQRMP = true
-    row.qrmpNote =
-      "QRMP supplier with quarterly filing — invoice appears under a prior quarter return period relative to this reconciliation month."
     row.actionUrgency = "Monitor"
     row.totalITCAtRisk = 0
+    row.qrmpNote =
+      "QRMP supplier with quarterly filing — invoice appears under a prior quarter return period relative to this reconciliation month."
     row.recommendedAction =
-      `QRMP supplier. Invoice from ${invDate} will appear in next quarter GSTR-2B. Do not claim ${formatINR(totalITC)} yet.`
+      `QRMP supplier. Invoice will appear in next quarter GSTR-2B. Do NOT claim ITC this month.`
   }
 }
 
@@ -130,11 +172,15 @@ export function checkIfQRMPFromSameSupplier(
   reconciliationYear?: number,
 ): boolean {
   if (reconciliationMonth == null || reconciliationYear == null) return false
+  const m = Number.parseInt(String(reconciliationMonth), 10)
+  const y = Number.parseInt(String(reconciliationYear), 10)
+  if (!Number.isFinite(m) || !Number.isFinite(y)) return false
   const norm = supplierGSTIN.trim()
   for (const r of rows2b) {
     if (r.supplierGSTIN.trim() !== norm) continue
+    if (!getGstr2bSupprdRaw(r)) continue
     if (r.itcAvailable === "N") continue
-    if (isQRMPInvoice(r, reconciliationMonth, reconciliationYear)) return true
+    if (isQRMPInvoice(r, m, y)) return true
   }
   return false
 }
@@ -226,13 +272,14 @@ function getITCDeadline(invoiceDate: string): {
 }
 
 function shouldComputeITCDeadline(status: MismatchStatus): boolean {
-  return status === "In PR Only" || status === "Suggested Match" || status === "Value Mismatch"
+  return status !== "Duplicate" && status !== "QRMP Delay"
 }
 
 function applyITCDeadlineFieldsAndEscalation(
   status: MismatchStatus,
   invoiceDateStr: string,
-  totalITCAtRisk: number,
+  /** Amount shown in the Section 16(4) banner (e.g. full 2B ITC when matched row has ₹0 “at risk”). */
+  itcAmountForDeadlineNotice: number,
   extras: ReturnType<typeof defaultRowFields>,
   mut: { itcRisk: ITCRiskLevel; action: string },
 ): void {
@@ -245,10 +292,10 @@ function applyITCDeadlineFieldsAndEscalation(
   extras.isDeadlineWarning = meta.isWarning
   extras.isDeadlineExpired = meta.isExpired
 
-  if (meta.isExpired && status === "In PR Only") {
+  if (meta.isExpired && status !== "Duplicate" && status !== "QRMP Delay") {
     mut.itcRisk = "Critical"
     mut.action =
-      `⚠️ ITC DEADLINE EXPIRED. Deadline was ${meta.deadlineStr}. This ITC of ${formatINR(totalITCAtRisk)} can no longer be claimed under Section 16(4). ` +
+      `⚠️ ITC CLAIM DEADLINE EXPIRED. Deadline was ${meta.deadlineStr}. This ITC of ${formatINR(itcAmountForDeadlineNotice)} can no longer be claimed under Section 16(4). ` +
       mut.action
   } else if (meta.isWarning && !meta.isExpired) {
     if (mut.itcRisk === "Medium") mut.itcRisk = "High"
@@ -273,6 +320,58 @@ function detectDuplicateKeys<T extends { supplierGSTIN: string; invoiceNumber: s
   return dup
 }
 
+/** First row per duplicate key stays in `primary`; extra rows go to `extras` (duplicate-only). */
+function partitionRowsByDuplicateKey<T extends { supplierGSTIN: string; invoiceNumber: string }>(
+  rows: T[],
+): { primary: T[]; extras: T[] } {
+  const dupKeys = detectDuplicateKeys(rows)
+  const seen = new Set<string>()
+  const primary: T[] = []
+  const extras: T[] = []
+  for (const r of rows) {
+    const k = makeMatchKey(r.supplierGSTIN, r.invoiceNumber)
+    if (!dupKeys.has(k)) {
+      primary.push(r)
+      continue
+    }
+    if (!seen.has(k)) {
+      seen.add(k)
+      primary.push(r)
+    } else {
+      extras.push(r)
+    }
+  }
+  return { primary, extras }
+}
+
+function applyItcAvailabilityStatus(
+  status: MismatchStatus,
+  b2b: GSTR2BRow | undefined,
+): { status: MismatchStatus; itcBlockReason: ITCBlockReason } {
+  if (!b2b) return { status, itcBlockReason: null }
+  if (b2b.itcAvailable === "N") {
+    const code = extractItcBlockCode(b2b.itcUnavailableReason)
+    let br: ITCBlockReason = null
+    if (code === "P") br = "permanent"
+    else if (code === "C") br = "conditional"
+    return { status: "ITC Blocked", itcBlockReason: br }
+  }
+  if (b2b.itcAvailable === "T") {
+    return { status: "ITC Temporary", itcBlockReason: null }
+  }
+  return { status, itcBlockReason: null }
+}
+
+function taxRatesDisagree(b2b: GSTR2BRow, pr: PurchaseRegisterRow): boolean {
+  const tr2 = normalizeGstRatePercent(b2b.taxRate)
+  const trp =
+    pr.taxRate !== undefined && Number.isFinite(pr.taxRate) && pr.taxRate > 0
+      ? normalizeGstRatePercent(pr.taxRate)
+      : inferTaxRatePR(pr)
+  if (tr2 === null || trp === null) return false
+  return Math.abs(tr2 - trp) > 0.5
+}
+
 function firstInvoiceForKey<T extends { supplierGSTIN: string; invoiceNumber: string }>(
   rows: T[],
   key: string,
@@ -281,14 +380,15 @@ function firstInvoiceForKey<T extends { supplierGSTIN: string; invoiceNumber: st
   return r?.invoiceNumber ?? ""
 }
 
+/** True when total tax matches but one side is IGST vs the other CGST+SGST (wrong tax type). */
 function detectTaxTypeMismatch(b2b: GSTR2BRow, pr: PurchaseRegisterRow): boolean {
   const total2B = b2b.igst + b2b.cgst + b2b.sgst
   const totalPR = pr.igst + pr.cgst + pr.sgst
-  if (Math.abs(total2B - totalPR) > 2) return false
-  const igstDiffers = Math.abs(b2b.igst - pr.igst) > 1
-  const cgstDiffers = Math.abs(b2b.cgst - pr.cgst) > 1
-  const sgstDiffers = Math.abs(b2b.sgst - pr.sgst) > 1
-  return igstDiffers || cgstDiffers || sgstDiffers
+  if (Math.abs(total2B - totalPR) > 1) return false
+  const typeSwitch =
+    (b2b.igst > 0 && pr.igst === 0 && (pr.cgst > 0 || pr.sgst > 0)) ||
+    (pr.igst > 0 && b2b.igst === 0 && (b2b.cgst > 0 || b2b.sgst > 0))
+  return typeSwitch
 }
 
 function valuesWithinFuzzyTolerance(b2b: GSTR2BRow, pr: PurchaseRegisterRow, tol: number): boolean {
@@ -370,14 +470,57 @@ function determineBaseStatus(
 ): MismatchStatus {
   if (b2b && !pr) return "In 2B Only"
   if (!b2b && pr) return "In PR Only"
-  const diffs = [
-    Math.abs(b2b!.taxableValue - pr!.taxableValue),
-    Math.abs(b2b!.igst - pr!.igst),
-    Math.abs(b2b!.cgst - pr!.cgst),
-    Math.abs(b2b!.sgst - pr!.sgst),
-  ]
-  const hasSignificantDiff = diffs.some((d) => d > tolerance)
-  return hasSignificantDiff ? "Value Mismatch" : "Matched"
+
+  const taxableDiff = Math.abs(b2b!.taxableValue - pr!.taxableValue)
+  const igst2B = b2b!.igst
+  const cgst2B = b2b!.cgst
+  const sgst2B = b2b!.sgst
+  const igstPR = pr!.igst
+  const cgstPR = pr!.cgst
+  const sgstPR = pr!.sgst
+
+  const absIgst = Math.abs(igst2B - igstPR)
+  const absCgst = Math.abs(cgst2B - cgstPR)
+  const absSgst = Math.abs(sgst2B - sgstPR)
+  const totalTaxDiff = absIgst + absCgst + absSgst
+
+  const total2B = igst2B + cgst2B + sgst2B
+  const totalPR = igstPR + cgstPR + sgstPR
+  const totalsClose = Math.abs(total2B - totalPR) <= 1
+
+  const typeSwitch =
+    (igst2B > 0 && igstPR === 0 && (cgstPR > 0 || sgstPR > 0)) ||
+    (igstPR > 0 && igst2B === 0 && (cgst2B > 0 || sgst2B > 0))
+
+  if (taxableDiff <= tolerance && totalTaxDiff > tolerance) {
+    if (totalsClose && typeSwitch) {
+      return "Tax Type Mismatch"
+    }
+
+    const tr2Explicit = normalizeGstRatePercent(b2b!.taxRate)
+    const trpExplicit =
+      pr!.taxRate !== undefined && Number.isFinite(pr!.taxRate) && pr!.taxRate > 0
+        ? normalizeGstRatePercent(pr!.taxRate)
+        : null
+
+    if (
+      tr2Explicit !== null &&
+      trpExplicit !== null &&
+      tr2Explicit > 0 &&
+      trpExplicit > 0 &&
+      Math.abs(tr2Explicit - trpExplicit) > 0.5
+    ) {
+      return "Tax Rate Mismatch"
+    }
+
+    return "Value Mismatch"
+  }
+
+  if (taxableDiff > tolerance) {
+    return "Value Mismatch"
+  }
+
+  return "Matched"
 }
 
 function calcITCAtRisk(
@@ -390,6 +533,16 @@ function calcITCAtRisk(
     case "Matched":
     case "Suggested Match":
       return 0
+    case "ITC Blocked":
+      return b2b ? b2b.igst + b2b.cgst + b2b.sgst : 0
+    case "ITC Temporary":
+      return b2b ? b2b.igst + b2b.cgst + b2b.sgst : 0
+    case "POS Mismatch":
+      return b2b ? b2b.igst + b2b.cgst + b2b.sgst : 0
+    case "CESS Mismatch":
+      return b2b && pr ? Math.abs((b2b.cess ?? 0) - (pr.cess ?? 0)) : 0
+    case "Tax Rate Mismatch":
+      return Math.abs(diffs.igst) + Math.abs(diffs.cgst) + Math.abs(diffs.sgst)
     case "Tax Type Mismatch":
       return Math.abs(diffs.igst) + Math.abs(diffs.cgst) + Math.abs(diffs.sgst)
     case "In 2B Only":
@@ -410,13 +563,96 @@ function calcITCAtRisk(
   }
 }
 
+export function isReconciliationIssueRow(r: ReconciliationRow): boolean {
+  return r.itcRisk !== "Safe" && r.status !== "QRMP Delay"
+}
+
+export function isSafeMatchedRow(r: ReconciliationRow): boolean {
+  return (
+    r.status === "Matched" &&
+    r.itcRisk === "Safe" &&
+    r.isPOSMismatch !== true &&
+    r.isDeadlineExpired !== true
+  )
+}
+
+/** Per-row ITC at risk after status and ITC risk are final (incl. QRMP override). */
+export function computeRowTotalITCAtRisk(r: ReconciliationRow): number {
+  const sum2B = (r.igst2B ?? 0) + (r.cgst2B ?? 0) + (r.sgst2B ?? 0)
+  const sumPR = (r.igstPR ?? 0) + (r.cgstPR ?? 0) + (r.sgstPR ?? 0)
+  if (r.status === "QRMP Delay") return 0
+  if (r.status === "Matched" && r.itcRisk === "Safe" && r.isPOSMismatch !== true && !r.isDeadlineExpired) {
+    return 0
+  }
+  if (r.status === "ITC Blocked" || r.itcAvailable === "N") return sum2B
+  if (r.status === "ITC Temporary") return sum2B
+  if (r.status === "Suggested Match") {
+    const td =
+      Math.abs(r.igstDiff ?? 0) + Math.abs(r.cgstDiff ?? 0) + Math.abs(r.sgstDiff ?? 0)
+    return td <= 1 ? 0 : td
+  }
+  if (r.status === "Value Mismatch") {
+    return Math.abs(r.igstDiff ?? 0) + Math.abs(r.cgstDiff ?? 0) + Math.abs(r.sgstDiff ?? 0)
+  }
+  if (r.status === "CESS Mismatch") return Math.abs(r.cessDiff ?? 0)
+  if (r.status === "Tax Rate Mismatch") {
+    return (
+      Math.abs(r.igstDiff ?? 0) + Math.abs(r.cgstDiff ?? 0) + Math.abs(r.sgstDiff ?? 0)
+    )
+  }
+  if (r.status === "POS Mismatch") return sum2B
+  if (r.status === "In PR Only") return sumPR
+  if (r.status === "In 2B Only") return sum2B
+  return sum2B
+}
+
+export function buildReconciliationSummary(results: ReconciliationRow[]): ReconciliationSummary {
+  const issueRows = results.filter(isReconciliationIssueRow)
+  const issuesITC = issueRows.reduce((s, r) => s + (r.totalITCAtRisk ?? 0), 0)
+  const safeMatched = results.filter(isSafeMatchedRow)
+  const prOnlyRows = results.filter((r) => r.status === "In PR Only")
+  if (process.env.NODE_ENV !== "production" && prOnlyRows.length > 0) {
+    // eslint-disable-next-line no-console -- verify Missing card PR-only count in development
+    console.log(
+      "PR Only rows:",
+      prOnlyRows.map((r) => r.invoiceNumber),
+    )
+  }
+  const totalCESSAtRisk = results.reduce((s, r) => s + Math.abs(r.cessDiff ?? 0), 0)
+  return {
+    totalInvoices: results.length,
+    matchedCount: safeMatched.length,
+    valueMismatchCount: results.filter((r) => r.status === "Value Mismatch").length,
+    in2BOnlyCount: results.filter((r) => r.status === "In 2B Only").length,
+    inPROnlyCount: prOnlyRows.length,
+    qrmpCount: results.filter((r) => r.status === "QRMP Delay").length,
+    issuesFoundCount: issueRows.length,
+    totalITCAtRisk: issuesITC,
+    totalITCSafe: safeMatched.reduce(
+      (s, r) => s + (r.igst2B ?? 0) + (r.cgst2B ?? 0) + (r.sgst2B ?? 0),
+      0,
+    ),
+    taxTypeMismatchCount: results.filter((r) => r.status === "Tax Type Mismatch").length,
+    suggestedMatchCount: results.filter((r) => r.status === "Suggested Match").length,
+    duplicateCount: results.filter((r) => r.status === "Duplicate").length,
+    rcmInvoiceCount: results.filter((r) => r.status === "RCM Invoice").length,
+    deadlineExpiredCount: results.filter((r) => r.isDeadlineExpired).length,
+    deadlineWarningCount: results.filter((r) => r.isDeadlineWarning && !r.isDeadlineExpired).length,
+    posMismatchCount: results.filter((r) => r.isPOSMismatch).length,
+    totalCESSAtRisk,
+  }
+}
+
 function determineBaseRisk(
   status: MismatchStatus,
   itcAvailable: ITCStatus | null,
   totalITCAtRisk: number,
 ): ITCRiskLevel {
   void totalITCAtRisk
-  if (itcAvailable === "N") return "Critical"
+  if (status === "ITC Blocked" || itcAvailable === "N") return "Critical"
+  if (status === "ITC Temporary") return "Medium"
+  if (status === "POS Mismatch" || status === "Tax Rate Mismatch") return "Medium"
+  if (status === "CESS Mismatch") return totalITCAtRisk > 100 ? "Medium" : "Low"
   if (status === "QRMP Delay") return "Low"
   if (status === "In PR Only") return "High"
   if (status === "In 2B Only") return "High"
@@ -428,17 +664,6 @@ function determineBaseRisk(
   if (itcAvailable === "T") return "Medium"
   if (status === "Matched" && itcAvailable === "Y") return "Safe"
   return "Medium"
-}
-
-function maxRisk(a: ITCRiskLevel, b: ITCRiskLevel): ITCRiskLevel {
-  const o: Record<ITCRiskLevel, number> = {
-    Safe: 0,
-    Low: 1,
-    Medium: 2,
-    High: 3,
-    Critical: 4,
-  }
-  return o[a] >= o[b] ? a : b
 }
 
 function generateBaseAction(
@@ -519,6 +744,27 @@ function generateBaseAction(
     }
   }
 
+  if (status === "POS Mismatch" && b2b) {
+    return {
+      action: `Place of Supply / tax component mismatch for Invoice ${inv}. GSTR-2B does not align with interstate vs intrastate treatment. Do NOT claim ${itcStr} until resolved with supplier ${gstin}.`,
+      urgency: "Before Filing",
+    }
+  }
+
+  if (status === "CESS Mismatch" && b2b && pr) {
+    return {
+      action: `CESS differs between GSTR-2B and books for Invoice ${inv}. Reconcile before claiming.`,
+      urgency: "Monitor",
+    }
+  }
+
+  if (status === "Tax Rate Mismatch") {
+    return {
+      action: `Tax rate % differs between GSTR-2B and Purchase Register for Invoice ${inv}. Verify HSN and rate mapping before claiming ${itcStr}.`,
+      urgency: "Before Filing",
+    }
+  }
+
   if (status === "In PR Only") {
     return {
       action: `Supplier ${gstin} has NOT filed GSTR-1. Invoice ${inv} is missing from GSTR-2B. Do NOT claim ${itcStr} ITC until supplier files. Send follow-up requesting GSTR-1 filing.`,
@@ -583,17 +829,42 @@ export async function reconcileB2B(
   reconciliationPeriod?: { month: number; year: number },
 ): Promise<{ rows: ReconciliationRow[]; summary: ReconciliationSummary }> {
   const tolerance = config?.itcMatchToleranceInr ?? 1
-  const recMonth = reconciliationPeriod?.month
-  const recYear = reconciliationPeriod?.year
+  /** Never default month/year to 0 — missing period skips QRMP via `recMonth == null`. */
+  const reconPeriod = normalizeReconciliationPeriod(reconciliationPeriod)
+  const recMonth = reconPeriod?.month
+  const recYear = reconPeriod?.year
 
-  const dup2B = detectDuplicateKeys(gstr2bRows)
-  const dupPR = detectDuplicateKeys(purchaseRows)
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console -- QRMP: verify period passed from hook
+    console.log("reconcileB2B called with:", {
+      gstr2bCount: gstr2bRows.length,
+      reconciliationMonth: recMonth,
+      reconciliationYear: recYear,
+      reconciliationPeriodRaw: reconciliationPeriod,
+      hasReconciliationPeriod: recMonth != null && recYear != null,
+    })
+  }
 
   const results: ReconciliationRow[] = []
+
+  if (process.env.NODE_ENV !== "production" && gstr2bRows.length > 0) {
+    const sampleRow = gstr2bRows[gstr2bRows.length - 1]!
+    // eslint-disable-next-line no-console -- QRMP / supprd column mapping (Kerala Tiles)
+    console.log("=== QRMP DEBUG ===")
+    // eslint-disable-next-line no-console -- QRMP / supprd column mapping (Kerala Tiles)
+    console.log("All field names:", Object.keys(sampleRow))
+    // eslint-disable-next-line no-console -- QRMP / supprd column mapping (Kerala Tiles)
+    console.log("supplierFilingPeriod:", sampleRow.supplierFilingPeriod)
+    // eslint-disable-next-line no-console -- QRMP / supprd column mapping (Kerala Tiles)
+    console.log("raw row:", JSON.stringify(sampleRow))
+    // eslint-disable-next-line no-console -- QRMP / supprd column mapping (Kerala Tiles)
+    console.log("=================")
+  }
 
   const pushDuplicateRows = <T extends { supplierGSTIN: string; invoiceNumber: string }>(
     rows: T[],
     dupKeys: Set<string>,
+    sourceRowsForDupOf: { supplierGSTIN: string; invoiceNumber: string }[],
     getB2b: (r: T) => GSTR2BRow | undefined,
     getPr: (r: T) => PurchaseRegisterRow | undefined,
   ) => {
@@ -603,7 +874,7 @@ export async function reconcileB2B(
       const b2b = getB2b(r as never)
       const pr = getPr(r as never)
       const base = (b2b ?? pr) as GSTR2BRow & PurchaseRegisterRow
-      const dupOf = firstInvoiceForKey(rows as { supplierGSTIN: string; invoiceNumber: string }[], key)
+      const dupOf = firstInvoiceForKey(sourceRowsForDupOf, key)
       const totalITC = b2b ? b2b.igst + b2b.cgst + b2b.sgst : pr!.igst + pr!.cgst + pr!.sgst
       const extras = defaultRowFields()
       extras.isDuplicate = true
@@ -623,6 +894,10 @@ export async function reconcileB2B(
         supplierGSTIN: base.supplierGSTIN,
         supplierName: (b2b?.supplierName ?? pr?.supplierName) || "",
         invoiceNumber: base.invoiceNumber,
+        rawInvoiceNumber2B: b2b?.rawInvoiceNumber ?? b2b?.invoiceNumber ?? null,
+        rawInvoiceNumberPR: pr?.rawInvoiceNumber ?? pr?.invoiceNumber ?? null,
+        normalisedInvoiceNumber2B: b2b ? normaliseInvoiceNo(b2b.invoiceNumber) : null,
+        normalisedInvoiceNumberPR: pr ? normaliseInvoiceNo(pr.invoiceNumber) : null,
         invoiceDate: (b2b?.invoiceDate ?? pr?.invoiceDate) || "",
         placeOfSupply: (b2b?.placeOfSupply ?? pr?.placeOfSupply) || "",
         matchKey: key,
@@ -651,11 +926,17 @@ export async function reconcileB2B(
     }
   }
 
-  pushDuplicateRows(gstr2bRows, dup2B, (r) => r as GSTR2BRow, () => undefined)
-  pushDuplicateRows(purchaseRows, dupPR, () => undefined, (r) => r as PurchaseRegisterRow)
+  const { primary: gstr2bPrimary, extras: gstr2bDupExtras } = partitionRowsByDuplicateKey(gstr2bRows)
+  const { primary: prPrimary, extras: prDupExtras } = partitionRowsByDuplicateKey(purchaseRows)
+  const dupKeysB2BExtras = new Set(
+    gstr2bDupExtras.map((r) => makeMatchKey(r.supplierGSTIN, r.invoiceNumber)),
+  )
+  const dupKeysPRExtras = new Set(prDupExtras.map((r) => makeMatchKey(r.supplierGSTIN, r.invoiceNumber)))
+  pushDuplicateRows(gstr2bDupExtras, dupKeysB2BExtras, gstr2bRows, (r) => r as GSTR2BRow, () => undefined)
+  pushDuplicateRows(prDupExtras, dupKeysPRExtras, purchaseRows, () => undefined, (r) => r as PurchaseRegisterRow)
 
-  const gstr2bMain = gstr2bRows.filter((r) => !dup2B.has(makeMatchKey(r.supplierGSTIN, r.invoiceNumber)))
-  const prMain = purchaseRows.filter((r) => !dupPR.has(makeMatchKey(r.supplierGSTIN, r.invoiceNumber)))
+  const gstr2bMain = gstr2bPrimary
+  const prMain = prPrimary
 
   const consumedB2B = new Set<string>()
   const consumedPR = new Set<string>()
@@ -709,7 +990,34 @@ export async function reconcileB2B(
         best.b2b.reverseCharge === "Y" ? "RCM Invoice" : "Suggested Match"
       if (rowStatus === "RCM Invoice") extras.isRCM = true
 
-      const totalITCAtRisk = calcITCAtRisk(rowStatus, best.b2b, pr, {
+      const itcAvailSuggested = applyItcAvailabilityStatus(rowStatus, best.b2b)
+      rowStatus = itcAvailSuggested.status
+      extras.itcBlockReason = itcAvailSuggested.itcBlockReason
+
+      const tr2n = normalizeGstRatePercent(best.b2b.taxRate)
+      extras.taxRate2B = tr2n ?? best.b2b.taxRate
+      const trpInf = inferTaxRatePR(pr)
+      extras.taxRatePR =
+        pr.taxRate !== undefined && Number.isFinite(pr.taxRate) && pr.taxRate > 0
+          ? normalizeGstRatePercent(pr.taxRate) ?? trpInf
+          : trpInf
+      if (taxRatesDisagree(best.b2b, pr)) {
+        extras.isTaxRateMismatch = true
+      }
+      const cDiff = (best.b2b.cess ?? 0) - (pr.cess ?? 0)
+      extras.cessDiff = cDiff
+      if (Math.abs(cDiff) > 1) {
+        extras.isCessMismatch = true
+      }
+
+      if (rowStatus === "Suggested Match" && extras.isCessMismatch && Math.abs(extras.cessDiff ?? 0) > 1) {
+        rowStatus = "CESS Mismatch"
+      }
+      if (rowStatus === "Suggested Match" && extras.isTaxRateMismatch) {
+        rowStatus = "Tax Rate Mismatch"
+      }
+
+      let totalITCAtRisk = calcITCAtRisk(rowStatus, best.b2b, pr, {
         igst: diffs.igst,
         cgst: diffs.cgst,
         sgst: diffs.sgst,
@@ -724,46 +1032,28 @@ export async function reconcileB2B(
         pr.invoiceNumber,
         totalITCAtRisk,
         diffs.taxable,
-        null,
+        extras.itcBlockReason,
         best.b2b,
         pr,
       )
 
-      const tr2 = best.b2b.taxRate
-      const trp = inferTaxRatePR(pr)
-      extras.taxRate2B = tr2
-      extras.taxRatePR = trp
-      if (trp !== null && Number.isFinite(tr2) && Math.abs(tr2 - trp) > 0.5) {
-        extras.isTaxRateMismatch = true
-        action += ` Note: Tax rate differs — GSTR-2B shows ${tr2}% but books show ${trp}%. Verify HSN code classification.`
-      }
-      const cDiff = (best.b2b.cess ?? 0) - (pr.cess ?? 0)
-      extras.cessDiff = cDiff
-      if (Math.abs(cDiff) > 1) {
-        extras.isCessMismatch = true
-        action += ` CESS difference of ${formatINR(Math.abs(cDiff))} detected. Verify if CESS applies to this supply.`
-        if (Math.abs(cDiff) > 1000) itcRisk = maxRisk(itcRisk, "Medium")
-      }
+      const sum2bTax = best.b2b.igst + best.b2b.cgst + best.b2b.sgst
+      const deadlineNoticeAmt = totalITCAtRisk > 0 ? totalITCAtRisk : sum2bTax
 
-      const pos = validatePOS(best.b2b, recipientGSTIN)
-      if (pos.hasMismatch) {
-        extras.isPOSMismatch = true
-        extras.posWarning = pos.warning
-        itcRisk = maxRisk(itcRisk, "Medium")
-      }
-
-      if (rowStatus === "Suggested Match") {
-        const invDate = (pr.invoiceDate || best.b2b.invoiceDate || "").trim()
-        const mut = { itcRisk, action }
-        applyITCDeadlineFieldsAndEscalation(rowStatus, invDate, totalITCAtRisk, extras, mut)
-        itcRisk = mut.itcRisk
-        action = mut.action
-      }
+      const invDate = (pr.invoiceDate || best.b2b.invoiceDate || "").trim()
+      const mut = { itcRisk, action }
+      applyITCDeadlineFieldsAndEscalation(rowStatus, invDate, deadlineNoticeAmt, extras, mut)
+      itcRisk = mut.itcRisk
+      action = mut.action
 
       results.push({
         supplierGSTIN: pr.supplierGSTIN,
         supplierName: best.b2b.supplierName || pr.supplierName,
         invoiceNumber: pr.invoiceNumber,
+        rawInvoiceNumber2B: best.b2b.rawInvoiceNumber ?? best.b2b.invoiceNumber,
+        rawInvoiceNumberPR: pr.rawInvoiceNumber ?? pr.invoiceNumber,
+        normalisedInvoiceNumber2B: normaliseInvoiceNo(best.b2b.invoiceNumber),
+        normalisedInvoiceNumberPR: normaliseInvoiceNo(pr.invoiceNumber),
         invoiceDate: best.b2b.invoiceDate || pr.invoiceDate,
         placeOfSupply: best.b2b.placeOfSupply || pr.placeOfSupply || "",
         matchKey: key,
@@ -814,16 +1104,13 @@ export async function reconcileB2B(
       sgst: b2b && pr ? b2b.sgst - pr.sgst : null,
     }
 
-    let itcBlock: ITCBlockReason = null
-    if (b2b?.itcAvailable === "N") {
-      const code = extractItcBlockCode(b2b.itcUnavailableReason)
-      if (code === "P") itcBlock = "permanent"
-      else if (code === "C") itcBlock = "conditional"
-      else itcBlock = null
-    }
-
     const extras = defaultRowFields()
-    extras.itcBlockReason = itcBlock
+
+    if (status === "Tax Type Mismatch" && b2b && pr) {
+      extras.isTaxTypeMismatch = true
+      extras.totalTax2B = b2b.igst + b2b.cgst + b2b.sgst
+      extras.totalTaxPR = pr.igst + pr.cgst + pr.sgst
+    }
 
     if (status === "Value Mismatch" && b2b && pr && detectTaxTypeMismatch(b2b, pr)) {
       status = "Tax Type Mismatch"
@@ -837,23 +1124,47 @@ export async function reconcileB2B(
       extras.isRCM = true
     }
 
-    if (status === "In PR Only" && pr) {
-      const fromSuprd = checkIfQRMPFromSameSupplier(
-        pr.supplierGSTIN,
-        gstr2bMain,
-        recMonth,
-        recYear,
-      )
-      const timing =
-        recMonth != null && recYear != null
-          ? isLikelyTimingDelay(pr.invoiceDate, recMonth, recYear)
-          : false
-      if (fromSuprd || timing) {
-        status = "QRMP Delay"
-        extras.isQRMP = true
-        extras.qrmpNote =
-          "QRMP suppliers file quarterly. April invoices appear in June GSTR-2B, July invoices in September, etc."
+    const itcAvailRes = applyItcAvailabilityStatus(status, b2b)
+    status = itcAvailRes.status
+    extras.itcBlockReason = itcAvailRes.itcBlockReason
+
+    if (b2b && pr) {
+      const tr2n = normalizeGstRatePercent(b2b.taxRate)
+      extras.taxRate2B = tr2n ?? b2b.taxRate
+      const trpInf = inferTaxRatePR(pr)
+      const trpn =
+        pr.taxRate !== undefined && Number.isFinite(pr.taxRate) && pr.taxRate > 0
+          ? normalizeGstRatePercent(pr.taxRate)
+          : trpInf
+      extras.taxRatePR = trpn ?? trpInf
+      if (taxRatesDisagree(b2b, pr)) {
+        extras.isTaxRateMismatch = true
       }
+      const cDiff = (b2b.cess ?? 0) - (pr.cess ?? 0)
+      extras.cessDiff = cDiff
+      if (Math.abs(cDiff) > 1) {
+        extras.isCessMismatch = true
+      }
+
+      const posEligible = status === "Matched" || status === "Value Mismatch"
+      if (posEligible) {
+        const pos = validatePOS(b2b, recipientGSTIN)
+        if (pos.hasMismatch) {
+          extras.isPOSMismatch = true
+          extras.posWarning = pos.warning
+        }
+      }
+    }
+
+    const posUpgradeStatuses: MismatchStatus[] = ["Matched", "Value Mismatch"]
+    if (extras.isPOSMismatch && posUpgradeStatuses.includes(status) && b2b && pr) {
+      status = "POS Mismatch"
+    }
+    if (status === "Matched" && extras.isCessMismatch && Math.abs(extras.cessDiff ?? 0) > 1) {
+      status = "CESS Mismatch"
+    }
+    if (status === "Matched" && extras.isTaxRateMismatch) {
+      status = "Tax Rate Mismatch"
     }
 
     let totalITCAtRisk = calcITCAtRisk(status, b2b, pr, {
@@ -861,7 +1172,6 @@ export async function reconcileB2B(
       cgst: diffs.cgst ?? 0,
       sgst: diffs.sgst ?? 0,
     })
-
     let itcRisk = determineBaseRisk(status, b2b?.itcAvailable ?? null, totalITCAtRisk)
 
     let { action, urgency } = generateBaseAction(
@@ -871,7 +1181,7 @@ export async function reconcileB2B(
       base.invoiceNumber,
       totalITCAtRisk,
       diffs.taxable,
-      itcBlock,
+      extras.itcBlockReason,
       b2b,
       pr,
     )
@@ -879,33 +1189,14 @@ export async function reconcileB2B(
     let recommendedAction = action
     let actionUrgency = urgency
 
-    if (b2b && pr) {
-      const tr2 = b2b.taxRate
-      const trp = inferTaxRatePR(pr)
-      extras.taxRate2B = tr2
-      extras.taxRatePR = trp
-      if (trp !== null && Number.isFinite(tr2) && Math.abs(tr2 - trp) > 0.5) {
-        extras.isTaxRateMismatch = true
-        recommendedAction += ` Note: Tax rate differs — GSTR-2B shows ${tr2}% but books show ${trp}%. Verify HSN classification.`
-      }
-      const cDiff = (b2b.cess ?? 0) - (pr.cess ?? 0)
-      extras.cessDiff = cDiff
-      if (Math.abs(cDiff) > 1) {
-        extras.isCessMismatch = true
-        recommendedAction += ` CESS difference of ${formatINR(Math.abs(cDiff))} detected. Verify if CESS applies.`
-        if (Math.abs(cDiff) > 1000) itcRisk = maxRisk(itcRisk, "Medium")
-      }
-      const pos = validatePOS(b2b, recipientGSTIN)
-      if (pos.hasMismatch) {
-        extras.isPOSMismatch = true
-        extras.posWarning = pos.warning
-        itcRisk = maxRisk(itcRisk, "Medium")
-      }
-    }
+    const sum2bForNotice = b2b ? b2b.igst + b2b.cgst + b2b.sgst : 0
+    const sumPrForNotice = pr ? pr.igst + pr.cgst + pr.sgst : 0
+    const deadlineNoticeAmt =
+      totalITCAtRisk > 0 ? totalITCAtRisk : sum2bForNotice > 0 ? sum2bForNotice : sumPrForNotice
 
     const invForDeadline = (pr?.invoiceDate || b2b?.invoiceDate || "").trim()
     const mutMain = { itcRisk, action: recommendedAction }
-    applyITCDeadlineFieldsAndEscalation(status, invForDeadline, totalITCAtRisk, extras, mutMain)
+    applyITCDeadlineFieldsAndEscalation(status, invForDeadline, deadlineNoticeAmt, extras, mutMain)
     itcRisk = mutMain.itcRisk
     recommendedAction = mutMain.action
 
@@ -923,16 +1214,16 @@ export async function reconcileB2B(
       }
     }
 
-    if (extras.isPOSMismatch) itcRisk = maxRisk(itcRisk, "Medium")
-    if (extras.isCessMismatch && Math.abs(extras.cessDiff ?? 0) > 1000) {
-      itcRisk = maxRisk(itcRisk, "Medium")
-    }
     if (status === "Duplicate" || extras.isDuplicate) itcRisk = "Critical"
 
     results.push({
       supplierGSTIN: base.supplierGSTIN,
       supplierName: b2b?.supplierName ?? pr?.supplierName ?? "",
       invoiceNumber: base.invoiceNumber,
+      rawInvoiceNumber2B: b2b?.rawInvoiceNumber ?? b2b?.invoiceNumber ?? null,
+      rawInvoiceNumberPR: pr?.rawInvoiceNumber ?? pr?.invoiceNumber ?? null,
+      normalisedInvoiceNumber2B: b2b ? normaliseInvoiceNo(b2b.invoiceNumber) : null,
+      normalisedInvoiceNumberPR: pr ? normaliseInvoiceNo(pr.invoiceNumber) : null,
       invoiceDate: b2b?.invoiceDate ?? pr?.invoiceDate ?? "",
       placeOfSupply: b2b?.placeOfSupply ?? pr?.placeOfSupply ?? "",
       matchKey: key,
@@ -963,7 +1254,17 @@ export async function reconcileB2B(
   applyCrossPeriodQrmpOverrides(results, map2B, recMonth, recYear)
 
   for (const r of results) {
+    r.totalITCAtRisk = computeRowTotalITCAtRisk(r)
+  }
+
+  for (const r of results) {
     r.riskSortOrder = Math.round(computeListSortOrder(r))
+  }
+
+  for (const r of results) {
+    if (r.status === "QRMP Delay") {
+      r.riskSortOrder = 99
+    }
   }
 
   results.sort((a, b) => {
@@ -971,28 +1272,7 @@ export async function reconcileB2B(
     return b.totalITCAtRisk - a.totalITCAtRisk
   })
 
-  const totalCESSAtRisk = results.reduce((s, r) => s + Math.abs(r.cessDiff ?? 0), 0)
-
-  const summary: ReconciliationSummary = {
-    totalInvoices: results.length,
-    matchedCount: results.filter((r) => r.status === "Matched").length,
-    valueMismatchCount: results.filter((r) => r.status === "Value Mismatch").length,
-    in2BOnlyCount: results.filter((r) => r.status === "In 2B Only").length,
-    inPROnlyCount: results.filter((r) => r.status === "In PR Only").length,
-    qrmpCount: results.filter((r) => r.status === "QRMP Delay").length,
-    totalITCAtRisk: results.reduce((s, r) => s + r.totalITCAtRisk, 0),
-    totalITCSafe: results
-      .filter((r) => r.status === "Matched")
-      .reduce((s, r) => s + (r.igst2B ?? 0) + (r.cgst2B ?? 0) + (r.sgst2B ?? 0), 0),
-    taxTypeMismatchCount: results.filter((r) => r.status === "Tax Type Mismatch").length,
-    suggestedMatchCount: results.filter((r) => r.status === "Suggested Match").length,
-    duplicateCount: results.filter((r) => r.status === "Duplicate").length,
-    rcmInvoiceCount: results.filter((r) => r.status === "RCM Invoice").length,
-    deadlineExpiredCount: results.filter((r) => r.isDeadlineExpired).length,
-    deadlineWarningCount: results.filter((r) => r.isDeadlineWarning && !r.isDeadlineExpired).length,
-    posMismatchCount: results.filter((r) => r.isPOSMismatch).length,
-    totalCESSAtRisk,
-  }
+  const summary = buildReconciliationSummary(results)
 
   return { rows: results, summary }
 }
@@ -1071,7 +1351,13 @@ function sumTaxQrmpDeferred(rows: ReconciliationRow[]): {
 }
 
 export function calculateGSTR3BSummary(rows: ReconciliationRow[]): GSTR3BSummary {
-  const eligibleRows = rows.filter((r) => r.status === "Matched" && r.itcAvailable === "Y")
+  const eligibleRows = rows.filter(
+    (r) =>
+      r.status === "Matched" &&
+      r.itcRisk === "Safe" &&
+      r.itcAvailable === "Y" &&
+      r.isPOSMismatch !== true,
+  )
   const ineligibleRows = rows.filter((r) => r.itcAvailable === "N")
   const deferredRows = rows.filter((r) => r.status === "In PR Only" && !r.isDeadlineExpired)
   const qrmpRows = rows.filter((r) => r.status === "QRMP Delay")
