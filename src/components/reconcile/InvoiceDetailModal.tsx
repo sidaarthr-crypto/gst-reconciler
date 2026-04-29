@@ -274,6 +274,24 @@ function buildComparisonRows(row: ReconciliationRow): CompareItem[] {
   return rows
 }
 
+function has2BData(row: ReconciliationRow): boolean {
+  return (
+    row.taxable2B != null ||
+    row.igst2B != null ||
+    row.cgst2B != null ||
+    row.sgst2B != null
+  )
+}
+
+function hasPRData(row: ReconciliationRow): boolean {
+  return (
+    row.taxablePR != null ||
+    row.igstPR != null ||
+    row.cgstPR != null ||
+    row.sgstPR != null
+  )
+}
+
 export function InvoiceDetailModal({
   row,
   allRows,
@@ -313,6 +331,21 @@ export function InvoiceDetailModal({
   const rawInvPR = row?.rawInvoiceNumberPR ?? row?.invoiceNumber ?? "—"
   const normInv2B = row?.normalisedInvoiceNumber2B ?? "—"
   const normInvPR = row?.normalisedInvoiceNumberPR ?? "—"
+  const duplicateContext = useMemo(() => {
+    if (!row || row.status !== "Duplicate") return null
+    const sameKeyRows = allRows.filter((r) => r.matchKey === row.matchKey)
+    const twoBRows = sameKeyRows.filter(has2BData)
+    const prRowsForKey = sameKeyRows.filter(hasPRData)
+    const firstTwoBRow = twoBRows.find((r) => r !== row) ?? null
+
+    return {
+      gstrOccurrences: twoBRows.length,
+      prOccurrences: prRowsForKey.length,
+      firstOccurrenceTaxable: firstTwoBRow?.taxable2B ?? null,
+      duplicateOccurrenceTaxable: row.taxable2B ?? null,
+      duplicateRisk: toNumber(row.igst2B) + toNumber(row.cgst2B) + toNumber(row.sgst2B),
+    }
+  }, [allRows, row])
 
   if (!row) return null
 
@@ -463,10 +496,50 @@ export function InvoiceDetailModal({
               ) : null}
 
               {row.status === "Duplicate" ? (
-                <div className="rounded-md border border-red-200 bg-red-50/70 p-3 text-xs text-red-900 space-y-1.5">
+                <div className="rounded-md border border-red-200 bg-red-50/70 p-3 text-xs text-red-900 space-y-2">
                   <p className="font-semibold">Duplicate Detection Details</p>
-                  <p>🔴 Match key: GSTIN <span className="font-mono">{row.supplierGSTIN}</span> + Invoice <span className="font-mono">{row.invoiceNumber}</span> = <span className="font-mono">{row.matchKey}</span></p>
-                  <p>This exact combination appears multiple times in GSTR-2B and can lead to double ITC claim of {formatINR(totalTax2B)}.</p>
+                  <p>Match key used:</p>
+                  <p className="font-mono">GSTIN: {row.supplierGSTIN}</p>
+                  <p className="font-mono">Invoice: {row.invoiceNumber}</p>
+                  <p className="font-mono">Key: {row.matchKey}</p>
+
+                  <div className="mt-2 overflow-hidden rounded-md border border-red-200 bg-white/70">
+                    <table className="w-full text-xs">
+                      <thead className="bg-red-50">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-semibold text-red-900">Source</th>
+                          <th className="px-2 py-1.5 text-left font-semibold text-red-900">Occurrences</th>
+                          <th className="px-2 py-1.5 text-left font-semibold text-red-900">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-red-100">
+                          <td className="px-2 py-1.5">GSTR-2B</td>
+                          <td className="px-2 py-1.5">{duplicateContext?.gstrOccurrences ?? 0} entries</td>
+                          <td className="px-2 py-1.5 font-medium text-red-700">Problem</td>
+                        </tr>
+                        <tr className="border-t border-red-100">
+                          <td className="px-2 py-1.5">Your Books</td>
+                          <td className="px-2 py-1.5">{duplicateContext?.prOccurrences ?? 0} entry</td>
+                          <td className="px-2 py-1.5 font-medium text-emerald-700">Correct</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p>
+                    Occurrence 1 taxable value:{" "}
+                    <span className="font-semibold">{formatINR(duplicateContext?.firstOccurrenceTaxable ?? null)}</span>
+                  </p>
+                  <p>
+                    Occurrence 2 taxable value:{" "}
+                    <span className="font-semibold">{formatINR(duplicateContext?.duplicateOccurrenceTaxable ?? null)}</span>{" "}
+                    (this row)
+                  </p>
+                  <p>
+                    Risk: claiming both would double-claim ITC of{" "}
+                    <span className="font-semibold">{formatINR(duplicateContext?.duplicateRisk ?? totalTax2B)}</span>.
+                  </p>
                 </div>
               ) : null}
 
@@ -541,13 +614,34 @@ export function InvoiceDetailModal({
 
           <section>
             <h3 className="text-sm font-semibold text-brand-navy">Invoice Data Comparison</h3>
+            {row.status === "Duplicate" ? (
+              <div className="mb-3 mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                <p className="font-semibold">Why Your Books column shows —</p>
+                <p className="mt-1">
+                  This is the duplicate (extra) occurrence of invoice {row.invoiceNumber} in
+                  GSTR-2B.
+                </p>
+                <p className="mt-1">
+                  Your Purchase Register has only 1 entry for this invoice, which is correct.
+                  GSTR-2B has {duplicateContext?.gstrOccurrences ?? 2} entries, which is the
+                  issue.
+                </p>
+              </div>
+            ) : null}
             <div className="mt-2 overflow-hidden rounded-lg border border-slate-200">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold">Field</th>
                     <th className="px-3 py-2 text-left font-semibold">GSTR-2B</th>
-                    <th className="px-3 py-2 text-left font-semibold">Your Books (PR)</th>
+                    <th className="px-3 py-2 text-left font-semibold">
+                      <div>Your Books (PR)</div>
+                      {row.status === "Duplicate" ? (
+                        <div className="text-[11px] italic font-normal text-slate-400">
+                          not applicable for duplicate entry
+                        </div>
+                      ) : null}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -574,7 +668,15 @@ export function InvoiceDetailModal({
                             "bg-amber-50 font-medium text-amber-700",
                         )}
                       >
-                        {item.right}
+                        <span
+                          title={
+                            row.status === "Duplicate" && item.right === "—"
+                              ? "This duplicate entry has no corresponding PR record. Your PR correctly has only 1 entry."
+                              : undefined
+                          }
+                        >
+                          {item.right}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -593,7 +695,9 @@ export function InvoiceDetailModal({
           <section>
             <h3 className="text-sm font-semibold text-brand-navy">What To Do</h3>
             <div className="mt-2 rounded-md border border-slate-200 border-l-4 border-l-blue-500 bg-white p-3 text-sm leading-relaxed">
-              {row.recommendedAction}
+              {row.status === "Duplicate"
+                ? `Invoice ${row.invoiceNumber} from supplier ${row.supplierGSTIN} appears twice in your GSTR-2B but only once in your Purchase Register.\n\nYour Purchase Register is correct.\n\nDo not claim ITC on this duplicate entry. Only claim ITC on the first matched occurrence of this invoice.`
+                : row.recommendedAction}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
               <span className="font-semibold">Urgency:</span>
