@@ -7,7 +7,7 @@ export const UmamiAnalytics = () => {
   return (
     <Script
       async
-      src="https://umami-production-<YOUR_UMAMI_RAILWAY_URL>.up.railway.app/script.js"
+      src="https://umami-production-d720.up.railway.app/script.js"
       data-website-id={websiteId}
       strategy="afterInteractive"
     />
