@@ -75,6 +75,9 @@ export default function ReconcilePage() {
     showGateModal,
     guestPromoVisible,
     dismissGuestPromo,
+    guestReconciliationsUsed,
+    guestReconciliationsLeft,
+    freeReconciliationLimit,
   } = useReconciliation(config, { isAuthenticated })
 
   const gstrFilename = gstr2bParseResult?.filename ?? ""
@@ -541,7 +544,8 @@ export default function ReconcilePage() {
               </span>
             </Button>
           ) : (
-            <Tooltip>
+            <div className="space-y-1">
+              <Tooltip>
               <TooltipTrigger
                 render={
                   <Button
@@ -589,7 +593,14 @@ export default function ReconcilePage() {
                   {reconcilePeriodTooltip}
                 </TooltipContent>
               ) : null}
-            </Tooltip>
+              </Tooltip>
+              {!isAuthenticated &&
+              guestReconciliationsLeft < 10 ? (
+                <p className="text-center text-xs text-slate-400">
+                  {guestReconciliationsLeft} free reconciliations remaining
+                </p>
+              ) : null}
+            </div>
           )}
         </div>
       ) : null}
@@ -607,7 +618,13 @@ export default function ReconcilePage() {
             />
           </div>
           <RequestIdBanner requestId={requestId} />
-          {guestPromoVisible ? <GuestPromoBanner onDismiss={dismissGuestPromo} /> : null}
+          {guestPromoVisible ? (
+            <GuestPromoBanner
+              onDismiss={dismissGuestPromo}
+              used={guestReconciliationsUsed}
+              limit={freeReconciliationLimit}
+            />
+          ) : null}
           {results.length > 0 ? (
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0 space-y-3">
@@ -751,7 +768,13 @@ export default function ReconcilePage() {
                 keep a copy.
               </p>
               {requestId ? <RequestIdBanner requestId={requestId} /> : null}
-              {guestPromoVisible ? <GuestPromoBanner onDismiss={dismissGuestPromo} /> : null}
+              {guestPromoVisible ? (
+                <GuestPromoBanner
+                  onDismiss={dismissGuestPromo}
+                  used={guestReconciliationsUsed}
+                  limit={freeReconciliationLimit}
+                />
+              ) : null}
               <SummaryCards summary={summary} results={results} />
               {results.length > 0 ? (
                 <GSTR3BSummary summary={gstr3bSummary} period={gstr3bPeriodLabel} />

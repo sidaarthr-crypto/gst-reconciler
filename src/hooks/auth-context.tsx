@@ -10,7 +10,7 @@ import {
 } from "react"
 import type { Session, User } from "@supabase/supabase-js"
 
-import { GUEST_USAGE_STORAGE_KEY } from "@/lib/guest-usage"
+import { migrateGuestStorage } from "@/lib/guest-usage"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { computeDisplayName } from "./useAuth"
 
@@ -41,6 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    migrateGuestStorage()
+  }, [])
+
+  useEffect(() => {
     const supabase = getSupabaseBrowserClient()
     let cancelled = false
 
@@ -67,11 +71,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     const supabase = getSupabaseBrowserClient()
     await supabase.auth.signOut()
-    try {
-      localStorage.removeItem(GUEST_USAGE_STORAGE_KEY)
-    } catch {
-      /* private mode */
-    }
     window.location.href = "/"
   }, [])
 

@@ -22,11 +22,10 @@ export function GateModal() {
           id="gate-title"
           className="mt-6 text-center text-xl font-bold text-brand-navy"
         >
-          Your free reconciliation was used
+          You&apos;ve used all 15 free reconciliations
         </h2>
         <p className="mt-3 text-center text-sm text-muted-foreground">
-          You&apos;ve already used your 1 free reconciliation. Create a free account to
-          reconcile every month and save your reports.
+          Sign up free to continue reconciling without limits.
         </p>
         <ul className="mt-6 space-y-2.5 text-sm text-brand-navy">
           <li className="flex items-start gap-2">
@@ -35,11 +34,19 @@ export function GateModal() {
           </li>
           <li className="flex items-start gap-2">
             <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-            <span>Save and access all your reports</span>
+            <span>Full reconciliation history</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-            <span>Request ID history for GST notices</span>
+            <span>Customer dashboard</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+            <span>Download Excel reports</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+            <span>Save and revisit past sessions</span>
           </li>
         </ul>
         <div className="mt-8 flex flex-col gap-3">
@@ -59,7 +66,7 @@ export function GateModal() {
               "flex h-11 w-full items-center justify-center border-brand-navy text-brand-navy",
             )}
           >
-            Sign In to Existing Account
+            Sign In
           </Link>
         </div>
         <p className="mt-4 text-center text-xs text-muted-foreground">

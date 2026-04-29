@@ -211,6 +211,8 @@ INSERT INTO app_config (key, value, description) VALUES
    'Toggle to take app offline'),
   ('free_tier_max_rows',       '200',    
    'Max rows on free tier'),
+  ('free_tier_max_reconciliations', '15',
+   'Number of free reconciliations allowed for guest users before signup is required'),
   ('show_sample_data_button',  'true',   
    'Show/hide Load Sample Data button')
 ON CONFLICT (key) DO NOTHING;

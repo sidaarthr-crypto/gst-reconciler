@@ -9,6 +9,7 @@ const DEFAULT_CONFIG: AppConfig = {
   appVersion: "1.0.0",
   maintenanceMode: false,
   freeTierMaxRows: 200,
+  freeTierMaxReconciliations: 15,
   showSampleDataButton: true,
 }
 
@@ -47,6 +48,10 @@ export function mapAppConfigRows(
     appVersion: map.app_version?.trim() || DEFAULT_CONFIG.appVersion,
     maintenanceMode: parseBoolean(map.maintenance_mode, DEFAULT_CONFIG.maintenanceMode),
     freeTierMaxRows: parseNumber(map.free_tier_max_rows, DEFAULT_CONFIG.freeTierMaxRows),
+    freeTierMaxReconciliations: parseNumber(
+      map.free_tier_max_reconciliations,
+      DEFAULT_CONFIG.freeTierMaxReconciliations,
+    ),
     showSampleDataButton: parseBoolean(
       map.show_sample_data_button,
       DEFAULT_CONFIG.showSampleDataButton,

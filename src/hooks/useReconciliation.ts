@@ -27,7 +27,11 @@ import type {
   ReconciliationSession,
   ReconciliationSummary,
 } from "@/lib/types"
-import { GUEST_USAGE_STORAGE_KEY } from "@/lib/guest-usage"
+import {
+  getGuestCount,
+  incrementGuestCount,
+  migrateGuestStorage,
+} from "@/lib/guest-usage"
 import { generateRequestId } from "@/lib/utils"
 
 export type Phase =
@@ -101,6 +105,19 @@ export function useReconciliation(
   const [showGateModal, setShowGateModal] = useState(false)
   const [showGuestPromoBanner, setShowGuestPromoBanner] = useState(false)
   const [guestPromoDismissed, setGuestPromoDismissed] = useState(false)
+  const [guestReconciliationsUsed, setGuestReconciliationsUsed] = useState(0)
+
+  const freeReconciliationLimit = config.freeTierMaxReconciliations || 15
+  const guestReconciliationsLeft = Math.max(
+    0,
+    freeReconciliationLimit - guestReconciliationsUsed,
+  )
+
+  useEffect(() => {
+    if (auth.isAuthenticated) return
+    migrateGuestStorage()
+    setGuestReconciliationsUsed(getGuestCount())
+  }, [auth.isAuthenticated])
 
   const [prPeriodMismatch, setPrPeriodMismatch] = useState<ReturnType<
     typeof detectPeriodMismatch
@@ -438,15 +455,9 @@ export function useReconciliation(
       return
     }
 
-    if (!auth.isAuthenticated) {
-      try {
-        if (localStorage.getItem(GUEST_USAGE_STORAGE_KEY) === "true") {
-          setShowGateModal(true)
-          return
-        }
-      } catch {
-        /* private mode — allow attempt */
-      }
+    if (!auth.isAuthenticated && getGuestCount() >= freeReconciliationLimit) {
+      setShowGateModal(true)
+      return
     }
 
     const vol = checkVolumeMismatch(gstr2bRows.length, prRows.length)
@@ -530,13 +541,10 @@ export function useReconciliation(
       setPhase("done")
 
       if (!auth.isAuthenticated) {
-        try {
-          localStorage.setItem(GUEST_USAGE_STORAGE_KEY, "true")
-          setShowGuestPromoBanner(true)
-          setGuestPromoDismissed(false)
-        } catch {
-          /* private mode */
-        }
+        const used = incrementGuestCount()
+        setGuestReconciliationsUsed(used)
+        setShowGuestPromoBanner(true)
+        setGuestPromoDismissed(false)
       }
 
       void (async () => {
@@ -585,6 +593,7 @@ export function useReconciliation(
     year,
     auth.isAuthenticated,
     volumeMismatchDismissed,
+    freeReconciliationLimit,
   ])
 
   const confirmVolumeAndReconcile = useCallback(() => {
@@ -626,6 +635,9 @@ export function useReconciliation(
     showGuestPromoBanner,
     guestPromoVisible: showGuestPromoBanner && !guestPromoDismissed,
     dismissGuestPromo: () => setGuestPromoDismissed(true),
+    guestReconciliationsUsed,
+    guestReconciliationsLeft,
+    freeReconciliationLimit,
     prPeriodMismatch,
     prPeriodMismatchDismissed,
     dismissPrPeriodMismatch: () => setPrPeriodMismatchDismissed(true),

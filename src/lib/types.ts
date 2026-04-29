@@ -44,6 +44,7 @@ export interface AppConfig {
   appVersion: string
   maintenanceMode: boolean
   freeTierMaxRows: number
+  freeTierMaxReconciliations: number
   showSampleDataButton: boolean
 }
 
