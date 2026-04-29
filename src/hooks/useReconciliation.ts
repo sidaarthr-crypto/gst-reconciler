@@ -32,6 +32,7 @@ import {
   incrementGuestCount,
   migrateGuestStorage,
 } from "@/lib/guest-usage"
+import { trackEvent } from "@/lib/analytics"
 import { generateRequestId } from "@/lib/utils"
 
 export type Phase =
@@ -231,6 +232,9 @@ export function useReconciliation(
         }
         setGstr2bParseResult(parsed)
         setGstr2bRows(parsed.validation?.isValid === false ? [] : parsed.rows)
+        if (parsed.validation?.isValid !== false) {
+          trackEvent("file-uploaded", { type: "gstr2b" })
+        }
       } catch (e) {
         const message =
           e instanceof ParseError
@@ -277,6 +281,9 @@ export function useReconciliation(
         }
         setPrParseResult(parsed)
         setPrRows(parsed.validation?.isValid === false ? [] : parsed.rows)
+        if (parsed.validation?.isValid !== false) {
+          trackEvent("file-uploaded", { type: "purchase-register" })
+        }
       } catch (e) {
         const message =
           e instanceof ParseError
@@ -523,6 +530,12 @@ export function useReconciliation(
 
       setResults(rows)
       setSummary(sum)
+      trackEvent("reconciliation-completed", {
+        matched: sum.matchedCount,
+        mismatched: Math.max(0, sum.totalInvoices - sum.matchedCount),
+        in_2b_only: sum.in2BOnlyCount,
+        in_pr_only: sum.inPROnlyCount,
+      })
       setSession({
         id: created.sessionId,
         requestId: rid,

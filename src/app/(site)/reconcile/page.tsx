@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { exportReconciliationWorkbook } from "@/lib/export"
 import { useReconciliation } from "@/hooks/useReconciliation"
 import { calculateGSTR3BSummary } from "@/lib/reconcile"
+import { trackEvent } from "@/lib/analytics"
 import { cn, getMonthName } from "@/lib/utils"
 
 export default function ReconcilePage() {
@@ -182,6 +183,7 @@ export default function ReconcilePage() {
           summary,
           rows: results,
         })
+        trackEvent("report-downloaded")
       } finally {
         setExportBusy(false)
       }

@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google"
 import { ThemeProvider } from "next-themes"
 
+import { UmamiAnalytics } from "@/components/UmamiAnalytics"
 import { AuthProvider } from "@/hooks/useAuth"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -56,6 +57,7 @@ export default function RootLayout({
             <Toaster richColors position="top-center" />
           </TooltipProvider>
         </ThemeProvider>
+        <UmamiAnalytics />
       </body>
     </html>
   )
