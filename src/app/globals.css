@@ -1,1 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
 @import "../styles/globals.css";
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+@keyframes borderGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20,71,230,.08); }
+  50%       { box-shadow: 0 0 0 6px rgba(20,71,230,.06); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes floatPill {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-3px); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.anim-fade-up {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.anim-fade-up.visible   { opacity: 1; transform: translateY(0); }
+
+.anim-fade-left {
+  opacity: 0;
+  transform: translateX(-24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.anim-fade-left.visible  { opacity: 1; transform: translateX(0); }
+
+.anim-fade-right {
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.anim-fade-right.visible { opacity: 1; transform: translateX(0); }
+
+.anim-scale-in {
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.anim-scale-in.visible   { opacity: 1; transform: scale(1); }
+
+.stagger-1 { transition-delay: 0.05s; }
+.stagger-2 { transition-delay: 0.12s; }
+.stagger-3 { transition-delay: 0.19s; }
+.stagger-4 { transition-delay: 0.26s; }
+.stagger-5 { transition-delay: 0.33s; }
+.stagger-6 { transition-delay: 0.40s; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+}
+
+.font-sora { font-family: 'Sora', sans-serif; }
+.font-dm { font-family: 'DM Sans', sans-serif; }
+
+.subnav-item.active {
+  color: #fff !important;
+  background: #1447E6 !important;
+  border-color: #1447E6 !important;
+  box-shadow: 0 2px 8px rgba(20,71,230,.3);
+}
+
+#features,
+#recon,
+#security,
+#history,
+#dashboard,
+#gstr3b {
+  scroll-margin-top: 132px;
+}
+
+/* Fallback: if JS fails, show everything */
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up,
+  .anim-fade-left,
+  .anim-fade-right,
+  .anim-scale-in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

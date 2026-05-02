@@ -1,19 +1,10 @@
-const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "GSTRecon"
-const version = process.env.NEXT_PUBLIC_APP_VERSION ?? ""
-
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-surface-2 py-10 text-center text-sm text-muted-foreground">
-      <p className="font-medium text-brand-navy">
-        {appName}
-        {version ? ` · v${version}` : ""}
-      </p>
-      <p className="mt-2 max-w-xl mx-auto px-4">
-        GST reconciliation tooling for chartered accountants. Figures are indicative;
-        always validate against GSTN records before filing.
-      </p>
-      <p className="mt-4 text-xs">
-        © {new Date().getFullYear()} {appName}. Built for the Indian GST ecosystem.
+    <footer className="flex items-center justify-between bg-[#060E1A] px-10 py-4 font-dm">
+      <p className="text-[12px] font-semibold text-slate-700">GST Shield · v1.0.0</p>
+      <p className="max-w-[420px] text-right text-[11px] leading-relaxed text-slate-700">
+        Figures are indicative; always validate against GSTN records before filing. © 2026 GST
+        Shield.
       </p>
     </footer>
   )

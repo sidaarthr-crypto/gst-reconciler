@@ -3,9 +3,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { buttonVariants } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-
 export function CTABanner() {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -19,23 +16,20 @@ export function CTABanner() {
   }
 
   return (
-    <section className="bg-brand-navy py-14 text-white">
-      <div className="mx-auto max-w-4xl px-4 text-center md:px-6">
-        <h2 className="text-2xl font-bold sm:text-3xl">
-          Ready to stop reconciling manually?
+    <section className="bg-[#0F1C2E] px-10 py-16 text-center font-dm">
+      <div className="anim-fade-up visible">
+        <h2 className="font-sora mb-3 text-[30px] font-extrabold tracking-[-0.6px] text-white">
+          Stop leaving ITC on the table.
         </h2>
-        <p className="mt-3 text-sm text-white/80 sm:text-base">
-          Join CAs across India saving hours every month.
+        <p className="mx-auto mb-7 max-w-[480px] text-[14px] leading-relaxed text-slate-400">
+          GST Shield finds mismatches, blocked credits, and recovery opportunities your team is missing
+          — every single month.
         </p>
         <button
           type="button"
           disabled={busy}
           onClick={go}
-          className={cn(
-            buttonVariants({ size: "lg" }),
-            "mt-8 w-full min-h-11 bg-white font-semibold text-brand-navy hover:bg-surface-2 md:w-auto md:min-w-[260px]",
-            "inline-flex items-center justify-center gap-2 disabled:pointer-events-none disabled:opacity-70",
-          )}
+          className="inline-flex items-center justify-center gap-2 rounded-[9px] border-none bg-[#1447E6] px-9 py-3.5 text-[14px] font-bold text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#0F3DD4] hover:shadow-[0_6px_20px_rgba(20,71,230,.35)] disabled:pointer-events-none disabled:opacity-70"
         >
           {busy ? (
             <>
@@ -47,7 +41,7 @@ export function CTABanner() {
             </>
           ) : (
             <>
-              Start Reconciling Free <span aria-hidden>→</span>
+              Start Free — First 15 Reconciliations Free <span aria-hidden>→</span>
             </>
           )}
         </button>

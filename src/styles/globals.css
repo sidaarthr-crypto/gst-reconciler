@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap");
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -139,10 +141,18 @@
   }
   html {
     @apply font-sans overflow-x-clip;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground overflow-x-clip;
     font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  button {
+    transition-property: color, background-color, border-color, opacity, box-shadow,
+      transform, translate;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -194,6 +204,47 @@
   font-family: var(--font-mono), ui-monospace, monospace;
 }
 
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Scoped pulse for hero badge — avoids overriding Tailwind’s default `pulse` utilities */
+@keyframes gstDotPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes borderGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(20, 71, 230, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(20, 71, 230, 0.06);
+  }
+}
+
 @keyframes gst-check-pop {
   from {
     transform: scale(0);
@@ -207,4 +258,11 @@
 
 .gst-check-pop {
   animation: gst-check-pop 0.3s ease-out forwards;
+}
+
+@layer utilities {
+  .risk-card,
+  .kpi-card {
+    @apply transition-all duration-200 hover:-translate-y-0.5;
+  }
 }

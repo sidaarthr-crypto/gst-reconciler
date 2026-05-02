@@ -7,6 +7,8 @@ export default {
       fontFamily: {
         sans: ["var(--font-jakarta)", "sans-serif"],
         mono: ["var(--font-mono)", "monospace"],
+        sora: ["Sora", "var(--font-sora)", "sans-serif"],
+        dm: ["DM Sans", "var(--font-dm)", "sans-serif"],
       },
       colors: {
         brand: {
