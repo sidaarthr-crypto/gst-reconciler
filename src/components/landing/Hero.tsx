@@ -169,14 +169,14 @@ export function Hero() {
 
             <p
               style={{
-                fontSize: "16px",
+                fontSize: "1.0625rem",
                 color: "#64748B",
-                lineHeight: 1.7,
+                lineHeight: 1.6,
                 maxWidth: "520px",
                 marginBottom: "28px",
               }}
             >
-              Upload your GSTR-2B and Purchase Register. GST Shield runs 16 reconciliation checks,
+              Upload your GSTR-2B and Purchase Register. GSTRecon runs 28 reconciliation checks,
               scores every invoice by ITC risk, and tells you exactly what to do — before you file
               GSTR-3B.
             </p>

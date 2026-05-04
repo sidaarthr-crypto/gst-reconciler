@@ -3,7 +3,7 @@ import { Navbar } from "@/components/layout/Navbar"
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="font-dm text-[15px]">
+    <div className="flex min-h-screen flex-col font-dm text-[15px]">
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />

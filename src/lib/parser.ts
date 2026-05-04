@@ -623,6 +623,12 @@ const PR_ALIASES = {
     examples: "rate, tax rate",
     required: false,
   },
+  itcAmount: {
+    aliases: ["booked itc", "itc amount", "itc claimed", "itc in books", "itc booked", "itc_amt", "itc amount (books)"],
+    label: "Booked ITC",
+    examples: "booked itc, itc amount",
+    required: false,
+  },
 } as const
 
 function getCell(row: Record<string, unknown>, headerName: string | null): unknown {
@@ -930,6 +936,7 @@ export async function parseGSTR2BFile(
       GSTR2B_ALIASES.invoiceDate.examples,
       false,
     ),
+    invoiceDtOnly: findColumn(headers, ["dt"], "Invoice date (dt)", "dt", false),
     invoiceValue: findColumn(
       headers,
       [...GSTR2B_ALIASES.invoiceValue.aliases],
@@ -1052,6 +1059,10 @@ export async function parseGSTR2BFile(
       )
     }
 
+    const invFromDt = col.invoiceDtOnly ? String(getCell(r, col.invoiceDtOnly) ?? "").trim() : ""
+    const invFromInvCol = col.invoiceDate ? String(getCell(r, col.invoiceDate) ?? "").trim() : ""
+    const invoiceDateMerged = invFromDt || invFromInvCol
+
     rows.push({
       supplierGSTIN,
       supplierName: String(getCell(r, col.supplierName) ?? "").trim(),
@@ -1067,7 +1078,8 @@ export async function parseGSTR2BFile(
       invoiceNumber,
       rawInvoiceNumber,
       invoiceType: String(getCell(r, col.invoiceType) ?? "").trim() || "B2B",
-      invoiceDate: String(getCell(r, col.invoiceDate) ?? "").trim(),
+      invoiceDate: invoiceDateMerged,
+      ...(invFromDt ? { dt: invFromDt } : {}),
       invoiceValue: parseNumber(getCell(r, col.invoiceValue)),
       placeOfSupply: String(getCell(r, col.placeOfSupply) ?? "").trim(),
       reverseCharge: parseReverseCharge(getCell(r, col.reverseCharge)),
@@ -1244,6 +1256,13 @@ export async function parsePurchaseRegisterFile(
       PR_ALIASES.taxRate.examples,
       false,
     ),
+    itcAmount: findColumn(
+      headers,
+      [...PR_ALIASES.itcAmount.aliases],
+      PR_ALIASES.itcAmount.label,
+      PR_ALIASES.itcAmount.examples,
+      false,
+    ),
   }
 
   const rows: PurchaseRegisterRow[] = []
@@ -1279,6 +1298,10 @@ export async function parsePurchaseRegisterFile(
     const taxRateCell = col.taxRate ? parseNumber(getCell(r, col.taxRate)) : NaN
     const taxRate = Number.isFinite(taxRateCell) && taxRateCell > 0 ? taxRateCell : undefined
 
+    const rawBookedItc = col.itcAmount ? parseNumber(getCell(r, col.itcAmount)) : NaN
+    const bookedItc =
+      col.itcAmount && Number.isFinite(rawBookedItc) ? rawBookedItc : undefined
+
     rows.push({
       supplierGSTIN,
       supplierName: String(getCell(r, col.supplierName) ?? "").trim(),
@@ -1294,6 +1317,7 @@ export async function parsePurchaseRegisterFile(
       placeOfSupply: String(getCell(r, col.placeOfSupply) ?? "").trim() || undefined,
       hsnCode: String(getCell(r, col.hsnCode) ?? "").trim() || undefined,
       ...(taxRate !== undefined ? { taxRate } : {}),
+      ...(bookedItc !== undefined ? { itcAmount: bookedItc } : {}),
     })
   }
 

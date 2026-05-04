@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react"
 import {
+  AlarmClock,
   AlertOctagon,
   AlertTriangle,
   Clock,
@@ -67,6 +68,10 @@ export function SummaryCards({
 
   const attention = showDup || showTaxType
 
+  const hasQrmpRow = (summary.qrmpCount ?? 0) > 0
+  const hasExpiredRow = expiredCount > 0
+  const itcAtRiskOnlyRow2 = !hasQrmpRow && !hasExpiredRow
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -77,7 +82,7 @@ export function SummaryCards({
               <p className="text-4xl font-semibold text-brand-navy">
                 {summary.totalInvoices}
               </p>
-              <p className="text-sm text-muted-foreground">B2B invoices processed</p>
+              <p className="text-base text-muted-foreground">B2B invoices processed</p>
             </div>
           </CardContent>
         </Card>
@@ -89,7 +94,7 @@ export function SummaryCards({
               <p className="text-4xl font-semibold text-risk-safe">
                 {summary.matchedCount}
               </p>
-              <p className="text-sm text-risk-safe">
+              <p className="text-base text-risk-safe">
                 {formatINR(summary.totalITCSafe)} safe to claim
               </p>
             </div>
@@ -101,8 +106,8 @@ export function SummaryCards({
             <AlertTriangle className="h-8 w-8 shrink-0 text-risk-medium" aria-hidden />
             <div>
               <p className="text-4xl font-semibold text-risk-medium">{issuesCount}</p>
-              <p className="text-sm text-muted-foreground">Issues Found</p>
-              <p className="text-sm text-risk-medium">
+              <p className="text-base text-muted-foreground">Issues Found</p>
+              <p className="text-base text-risk-medium">
                 {formatINR(summary.totalITCAtRisk)} at risk
               </p>
             </div>
@@ -120,79 +125,81 @@ export function SummaryCards({
             </div>
           </CardContent>
         </Card>
-
-        <Card className="col-span-2 border-l-4 border-l-risk-critical border-border shadow-sm md:col-span-3 lg:col-span-4">
-          <CardContent className="flex flex-col gap-2 p-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <AlertOctagon className="h-10 w-10 shrink-0 text-risk-critical" aria-hidden />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-risk-critical">
-                  Total ITC At Risk
-                </p>
-                <p className="text-4xl font-bold text-risk-critical">
-                  {formatINR(summary.totalITCAtRisk)}
-                </p>
-                <p className="text-sm text-risk-critical">Requires immediate attention</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {(summary.qrmpCount ?? 0) > 0 ? (
-        <Card className="border border-blue-100 border-l-4 border-l-blue-500 bg-[#EFF6FF] shadow-sm">
-          <CardContent className="flex gap-4 p-5">
-            <Clock className="h-8 w-8 shrink-0 text-blue-600" aria-hidden />
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card
+          className={`min-h-[140px] border-border border-l-4 border-l-risk-critical shadow-sm ${itcAtRiskOnlyRow2 ? "md:col-span-3" : ""}`}
+        >
+          <CardContent className="flex items-start gap-4 p-5">
+            <AlertOctagon className="h-8 w-8 shrink-0 text-risk-critical" aria-hidden />
             <div>
-              <p className="text-lg font-semibold text-blue-900">
-                {summary.qrmpCount} QRMP supplier invoice{summary.qrmpCount === 1 ? "" : "s"}
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Total ITC at risk
               </p>
-              <p className="mt-1 text-sm text-blue-900/90">
-                These will appear in next quarter&apos;s GSTR-2B. No action needed.
+              <p className="mt-1 text-3xl font-bold text-risk-critical md:text-4xl">
+                {formatINR(summary.totalITCAtRisk)}
               </p>
+              <p className="mt-1 text-sm text-muted-foreground">Requires immediate attention</p>
             </div>
           </CardContent>
         </Card>
-      ) : null}
 
-      {expiredCount > 0 || warningCount > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {expiredCount > 0 ? (
-            <Card className="border border-red-200 border-l-4 border-l-red-600 bg-[#FEF2F2] shadow-sm">
-              <CardContent className="flex gap-3 p-5">
-                <span className="text-2xl" aria-hidden>
-                  ⏰
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-red-900">ITC Deadlines Expired</p>
-                  <p className="mt-1 text-3xl font-bold text-red-800">{expiredCount}</p>
-                  <p className="text-xs text-red-800/90">invoices past Section 16(4) limit</p>
-                  <p className="mt-3 text-xs leading-relaxed text-red-900">
-                    These ITC claims are permanently lost and cannot be recovered.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
-          {warningCount > 0 ? (
-            <Card className="border border-amber-200 border-l-4 border-l-amber-500 bg-[#FFFBEB] shadow-sm">
-              <CardContent className="flex gap-3 p-5">
-                <span className="text-2xl" aria-hidden>
-                  ⏰
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-amber-950">ITC Deadlines Approaching</p>
-                  <p className="mt-1 text-3xl font-bold text-amber-900">{warningCount}</p>
-                  <p className="text-xs text-amber-900/90">invoices expiring within 60 days</p>
-                  <p className="mt-3 text-xs leading-relaxed text-amber-950">
-                    {nearestDeadlineLabel
-                      ? `Act before ${nearestDeadlineLabel} to claim this ITC.`
-                      : "Act before the deadline to claim this ITC."}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
+        {(summary.qrmpCount ?? 0) > 0 ? (
+          <Card className="min-h-[140px] border-border border-l-4 border-l-blue-500 shadow-sm">
+            <CardContent className="flex items-start gap-4 p-5">
+              <Clock className="h-8 w-8 shrink-0 text-blue-600" aria-hidden />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  QRMP supplier invoices
+                </p>
+                <p className="mt-1 text-3xl font-bold text-blue-600 md:text-4xl">{summary.qrmpCount}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Will appear in next quarter&apos;s GSTR-2B
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {expiredCount > 0 ? (
+          <Card className="min-h-[140px] border-border border-l-4 border-l-red-600 shadow-sm">
+            <CardContent className="flex items-start gap-4 p-5">
+              <AlarmClock className="h-8 w-8 shrink-0 text-red-600" aria-hidden />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  ITC deadlines expired
+                </p>
+                <p className="mt-1 text-3xl font-bold text-red-600 md:text-4xl">{expiredCount}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Invoices past Section 16(4) limit</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  These ITC claims are permanently lost
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
+
+      {warningCount > 0 ? (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Card className="min-h-[140px] border-border border-l-4 border-l-amber-500 shadow-sm">
+            <CardContent className="flex items-start gap-4 p-5">
+              <AlarmClock className="h-8 w-8 shrink-0 text-amber-600" aria-hidden />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  ITC deadlines approaching
+                </p>
+                <p className="mt-1 text-3xl font-bold text-amber-700 md:text-4xl">{warningCount}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Invoices expiring within 60 days</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  {nearestDeadlineLabel
+                    ? `Act before ${nearestDeadlineLabel} to claim this ITC.`
+                    : "Act before the deadline to claim this ITC."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       ) : null}
 
@@ -215,7 +222,7 @@ export function SummaryCards({
                 <CardContent className="flex gap-2 p-3 pr-8">
                   <Copy className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden />
                   <div>
-                    <p className="text-sm font-semibold text-red-900">
+                    <p className="text-base font-semibold text-red-900">
                       {summary.duplicateCount} duplicate invoices found
                     </p>
                     <p className="text-xs text-red-800">
@@ -241,7 +248,7 @@ export function SummaryCards({
                     ↔
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-amber-950">
+                    <p className="text-base font-semibold text-amber-950">
                       {summary.taxTypeMismatchCount} tax type mismatches
                     </p>
                     <p className="text-xs text-amber-900">

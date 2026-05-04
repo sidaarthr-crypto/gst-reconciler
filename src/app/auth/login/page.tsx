@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react"
 
 import { GoogleIcon } from "@/components/auth/GoogleIcon"
 import { authCardClass, authInputClass } from "@/components/auth/auth-styles"
+import { BrandLogo } from "@/components/ui/BrandLogo"
 import { buttonVariants } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { mapAuthErrorMessage } from "@/lib/auth-errors"
@@ -54,7 +55,7 @@ export default function LoginPage() {
         return
       }
       setSuccess(true)
-      window.setTimeout(() => router.push("/reconcile"), 1000)
+      window.setTimeout(() => router.push("/dashboard"), 1000)
     } catch {
       setError("Something went wrong. Please try again.")
       setLoading(false)
@@ -83,16 +84,10 @@ export default function LoginPage() {
 
   return (
     <>
-      <div className="mb-8 flex justify-center">
-        <Link href="/" className="flex items-center gap-2 text-brand-navy">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-navy text-sm font-bold text-white">
-            G
-          </span>
-          <span className="text-lg font-semibold">{appName}</span>
-        </Link>
-      </div>
-
       <div className={authCardClass}>
+        <div className="mb-8 flex justify-center">
+          <BrandLogo size="lg" linkToHome variant="dark" />
+        </div>
         <h1 className="text-2xl font-bold text-brand-navy">Welcome back</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Sign in to your {appName} account

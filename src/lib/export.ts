@@ -15,6 +15,7 @@ const RISK_STYLES: Record<
   Medium: { fill: "FFFBEB", font: "D97706" },
   Low: { fill: "E0F2FE", font: "0369A1" },
   Safe: { fill: "F0FDF4", font: "16A34A" },
+  None: { fill: "F1F5F9", font: "64748B" },
 }
 
 const DEADLINE_COL_INDEX = 18
@@ -53,6 +54,16 @@ function formatDeadlineForExport(row: ReconciliationRow): string {
   }
   if (row.itcClaimDeadline) {
     return `${row.itcClaimDeadline} (${row.daysToDeadline ?? 0} days)`
+  }
+  const inv = row.invoiceDate?.trim()
+  if (inv) {
+    const info = getITCDeadlineInfo(inv)
+    if (info) {
+      if (info.isExpired) {
+        return info.deadlineStr ? `EXPIRED - ${info.deadlineStr}` : "EXPIRED"
+      }
+      return `${info.deadlineStr} (${info.daysRemaining} days)`
+    }
   }
   return "N/A"
 }

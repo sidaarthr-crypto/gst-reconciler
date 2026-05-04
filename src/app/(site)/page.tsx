@@ -8,10 +8,11 @@ import {
   ShieldCheck,
   UserCircle2,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { CTABanner } from "@/components/landing/CTABanner"
+import { Features } from "@/components/landing/Features"
 import { Hero } from "@/components/landing/Hero"
 import { useAuth } from "@/hooks/useAuth"
 
@@ -33,6 +34,119 @@ const MODAL_ITEMS = [
   ["CESS Mismatch", "CESS amount differs between 2B and PR.", "Follow up", "bg-amber-100 text-amber-800"],
   ["Period Timing", "Invoice belongs to a different return period.", "Next period", "bg-blue-100 text-blue-800"],
 ] as const
+
+type ModalCard = readonly [string, string, string, string]
+
+type ModalSectionConfig = {
+  heading: string
+  /** Heading label colour */
+  labelClassName: string
+  items: ModalCard[]
+}
+
+const FIRST_CHECKS_SECTION = {
+  heading: "✓ MATCHED & FLAGGED",
+  labelClassName: "text-green-700",
+} as const
+
+const MODAL_EXTRA_SECTIONS: ModalSectionConfig[] = [
+  {
+    heading: "✓ SMART MATCH",
+    labelClassName: "text-blue-700",
+    items: [
+      [
+        "Date Gap Match (M-3)",
+        "Invoice and GSTIN match but dates differ beyond 30 days. Still a confirmed match.",
+        "Verify period",
+        "bg-emerald-100 text-emerald-800",
+      ],
+      [
+        "Group Entity Match (M-4-PAN)",
+        "Same PAN, different state GSTIN. Same legal entity under another state registration.",
+        "Verify PoS",
+        "bg-emerald-100 text-emerald-800",
+      ],
+      [
+        "GSTIN Mismatch Match (M-4)",
+        "Invoice number and amounts match but GSTINs differ completely. Verify supplier registration.",
+        "Follow up",
+        "bg-amber-100 text-amber-800",
+      ],
+      [
+        "Amount-Led Match (M-5)",
+        "GSTIN matches and GST amounts agree even though invoice numbers differ.",
+        "Verify",
+        "bg-amber-100 text-amber-800",
+      ],
+      [
+        "Consolidated Invoice Match (M-6)",
+        "One books entry matched to multiple portal invoices that together equal the same total.",
+        "Verify",
+        "bg-emerald-100 text-emerald-800",
+      ],
+    ],
+  },
+  {
+    heading: "~ NEEDS REVIEW",
+    labelClassName: "text-yellow-700",
+    items: [
+      [
+        "Probable Month Match (P-2)",
+        "Same GST amount and same calendar month. Review before claiming ITC — could be coincidence.",
+        "Review",
+        "bg-amber-100 text-amber-800",
+      ],
+    ],
+  },
+  {
+    heading: "⚠ ACTION REQUIRED",
+    labelClassName: "text-orange-700",
+    items: [
+      [
+        "Unclaimed ITC (Q-8)",
+        "An eligible GSTR-2B record exists but ITC has not been booked. Potential missed credit.",
+        "Book ITC",
+        "bg-orange-100 text-orange-800",
+      ],
+      [
+        "ITC Eligibility Uncertain (Q-9)",
+        "Eligibility needs review before claiming. Common with mixed-use purchases.",
+        "Review",
+        "bg-amber-100 text-amber-800",
+      ],
+      [
+        "Debit Note Misclassified (Q-10)",
+        "Portal and books disagree on debit vs credit note. Immediate correction required.",
+        "Act immediately",
+        "bg-red-100 text-red-800",
+      ],
+      [
+        "Partially Booked ITC (Q-14)",
+        "Books GST is less than 90% of the portal amount. Looks like ITC booked in instalments.",
+        "Follow up",
+        "bg-amber-100 text-amber-800",
+      ],
+      [
+        "ITC Reduced by Supplier (I-8)",
+        "Supplier filed a lower ITC amount on the portal than your books show. Claim only the portal amount.",
+        "Adjust books",
+        "bg-amber-100 text-amber-800",
+      ],
+    ],
+  },
+  {
+    heading: "⊘ EXCLUDED FROM SCOPE",
+    labelClassName: "text-gray-500",
+    items: [
+      [
+        "Non-GST Entry (X-1)",
+        "Journal entry with no GSTIN and zero tax. Excluded from reconciliation scope entirely.",
+        "Excluded",
+        "bg-slate-100 text-slate-700",
+      ],
+    ],
+  },
+]
 
 export default function HomePage() {
   const [showModal, setShowModal] = useState(false)
@@ -93,83 +207,7 @@ export default function HomePage() {
       <style>{`html { scroll-behavior: smooth; }`}</style>
       <Hero />
 
-      <section id="features" className="bg-slate-50 px-12 py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="anim-fade-up">
-            <p className="mb-2 text-[12px] font-bold uppercase tracking-[2px] text-[#1447E6]">FEATURES</p>
-            <h2 className="font-sora mb-2 text-[30px] font-extrabold tracking-[-0.6px] text-[#0F1C2E]">
-              Built for CAs. Designed for real GST compliance.
-            </h2>
-            <p className="mb-8 text-[15px] leading-relaxed text-slate-500">
-              Every invoice scored, categorised, and given a plain-English action — before you file GSTR-3B.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
-            <div className="anim-fade-left">
-              <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[.8px] text-slate-400">ITC RISK LEVELS</p>
-              <div className="grid grid-cols-2 gap-2.5">
-                {[
-                  ["Critical", "ITC blocked or permanently denied. Cannot claim under any scenario.", "bg-red-600 text-white", "border-l-red-600", "Act immediately", "#DC2626", "text-red-700"],
-                  ["High", "Invoice missing from 2B. Supplier hasn't filed. ITC at risk this period.", "bg-amber-500 text-white", "border-l-amber-600", "Follow up now", "#D97706", "text-amber-700"],
-                  ["Medium", "Value or tax mismatch. Claimable only after correction from supplier.", "bg-orange-500 text-white", "border-l-orange-600", "Follow up", "#EA580C", "text-orange-700"],
-                  ["Low", "QRMP delay or timing difference. Likely in next month's 2B.", "bg-blue-600 text-white", "border-l-blue-700", "Next month", "#2563EB", "text-blue-700"],
-                ].map(([name, desc, pill, border, badge, dot, nameColor]) => (
-                  <div key={String(name)} className={`rounded-xl border border-slate-200 border-l-[3px] ${border} bg-white p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_4px_16px_rgba(15,28,46,.08)]`}>
-                    <div className="mb-1.5 flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: String(dot) }} />
-                      <p className={`font-sora text-[14px] font-bold ${nameColor}`}>{name}</p>
-                    </div>
-                    <p className="text-[13px] leading-[1.55] text-slate-500">{desc}</p>
-                    <span className={`mt-2 inline-block rounded px-2 py-0.5 text-[10px] font-bold ${pill}`}>{badge}</span>
-                  </div>
-                ))}
-                <div className="col-span-2 flex items-start justify-between rounded-xl border border-slate-200 border-l-[3px] border-l-emerald-700 bg-white p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_4px_16px_rgba(15,28,46,.08)]">
-                  <div>
-                    <div className="mb-1.5 flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                      <p className="font-sora text-[14px] font-bold text-emerald-700">Safe</p>
-                    </div>
-                    <p className="text-[13px] leading-[1.55] text-slate-500">
-                      Fully matched and verified. ITC claimable without any action required.
-                    </p>
-                  </div>
-                  <span className="ml-4 flex-shrink-0 rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                    No action needed
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div id="recon" className="anim-fade-right">
-              <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[.8px] text-slate-400">RECONCILIATION ENGINE</p>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 animate-[borderGlow_3s_infinite]">
-                <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[.8px] text-slate-400">WHAT WE DO</p>
-                <h3 className="font-sora mb-3 text-[16px] font-extrabold text-[#0F1C2E]">16-Point Invoice Reconciliation</h3>
-                <p className="mb-5 text-[13px] leading-relaxed text-slate-500">
-                  Every B2B invoice is normalised, matched by GSTIN + Invoice Number, then compared across value, tax type, tax rate, ITC availability, place of supply, CESS, return period, and RCM status — with a ₹1 tolerance built in.
-                </p>
-                <div className="mb-5 flex items-baseline gap-2.5">
-                  <span className="font-sora text-[52px] font-extrabold leading-none text-[#1447E6]">16</span>
-                  <span className="text-[13px] text-slate-400">diagnostic checks / per invoice</span>
-                </div>
-                <div className="mb-5 flex flex-wrap gap-1.5">
-                  {["Matched", "Value Mismatch", "ITC Blocked", "In PR Only", "In 2B Only", "QRMP Delay", "RCM Invoice", "Section 16(4)", "+ 8 more →"].map((chip) => (
-                    <span key={chip} className="rounded-md bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">{chip}</span>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(true)}
-                  className="w-full rounded-[9px] bg-[#0F1C2E] py-3 text-[13px] font-bold text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#1a3050] hover:shadow-[0_4px_14px_rgba(15,28,46,.2)]"
-                >
-                  View all 16 reconciliation checks →
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Features onViewAllChecks={() => setShowModal(true)} />
 
       {showModal && (
         <div
@@ -178,28 +216,85 @@ export default function HomePage() {
             if (e.target === e.currentTarget) setShowModal(false)
           }}
         >
-          <div className="max-h-[80vh] w-full max-w-[640px] overflow-y-auto rounded-[14px] bg-white animate-[scaleIn_.2s_ease_both]">
-            <div className="sticky top-0 flex items-center justify-between bg-[#0F1C2E] px-5 py-3.5">
-              <h3 className="font-sora text-[15px] font-bold text-white">All 16 Reconciliation Checks</h3>
+          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[14px] bg-white shadow-xl animate-[scaleIn_.2s_ease_both]">
+            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-slate-700 bg-[#0F1C2E] px-8 py-5">
+              <h3 className="font-sora text-[15px] font-bold text-white">All 28 Reconciliation Checks</h3>
               <button type="button" className="text-[20px] text-slate-400 hover:text-white" onClick={() => setShowModal(false)}>✕</button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2">
-              {MODAL_ITEMS.map((item, i) => (
-                <div key={item[0]} className={`flex gap-2.5 border-b border-r border-slate-100 p-3.5 transition-colors hover:bg-slate-50 ${i % 2 === 1 ? "sm:border-r-0" : ""} ${i >= 14 ? "border-b-0" : ""}`}>
-                  <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[4px] bg-[#0F1C2E] text-[10px] font-bold text-white">{i + 1}</span>
-                  <div>
-                    <p className="text-[12px] font-bold text-[#0F1C2E]">{item[0]}</p>
-                    <p className="text-[11px] leading-[1.4] text-slate-400">{item[1]}</p>
-                    <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${item[3]}`}>{item[2]}</span>
-                  </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="col-span-full -mx-8 border-y border-gray-200 bg-slate-50 px-8 py-3">
+                  <p className={`text-xs font-bold uppercase tracking-widest ${FIRST_CHECKS_SECTION.labelClassName}`}>
+                    {FIRST_CHECKS_SECTION.heading}
+                  </p>
                 </div>
-              ))}
+                {MODAL_ITEMS.map((item, i) => (
+                  <div
+                    key={item[0]}
+                    className="flex gap-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:border-gray-300 hover:shadow-md"
+                  >
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0F1C2E] text-sm font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-1 text-base font-semibold text-gray-900">{item[0]}</p>
+                      <p className="mb-3 text-sm text-gray-500">{item[1]}</p>
+                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${item[3]}`}>{item[2]}</span>
+                    </div>
+                  </div>
+                ))}
+                {(() => {
+                  let cardNum = MODAL_ITEMS.length
+                  return MODAL_EXTRA_SECTIONS.map((section) => (
+                    <Fragment key={section.heading}>
+                      <div className="col-span-full -mx-8 border-y border-gray-200 bg-slate-50 px-8 py-3">
+                        <p className={`text-xs font-bold uppercase tracking-widest ${section.labelClassName}`}>
+                          {section.heading}
+                        </p>
+                      </div>
+                      {section.items.map((item) => {
+                        cardNum += 1
+                        return (
+                          <div
+                            key={`${section.heading}-${item[0]}`}
+                            className="flex gap-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:border-gray-300 hover:shadow-md"
+                          >
+                            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0F1C2E] text-sm font-bold text-white">
+                              {cardNum}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="mb-1 text-base font-semibold text-gray-900">{item[0]}</p>
+                              <p className="mb-3 text-sm text-gray-500">{item[1]}</p>
+                              <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${item[3]}`}>{item[2]}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </Fragment>
+                  ))
+                })()}
+              </div>
             </div>
-            <div className="sticky bottom-0 flex flex-wrap gap-4 border-t border-slate-200 bg-white px-6 py-4 text-[12px] text-slate-500">
-              <span className="inline-flex items-center gap-2"><span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">Act immediately</span></span>
-              <span className="inline-flex items-center gap-2"><span className="rounded bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">Follow up</span></span>
-              <span className="inline-flex items-center gap-2"><span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">Next month</span></span>
-              <span className="inline-flex items-center gap-2"><span className="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">No action</span></span>
+            <div className="sticky bottom-0 z-10 shrink-0 border-t border-gray-200 bg-white px-8 py-4">
+              <p className="mb-3 text-xs font-semibold text-gray-700">What the urgency badges mean</p>
+              <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs text-gray-600">
+                <span className="inline-flex max-w-[280px] flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                  <span className="shrink-0 rounded-full bg-red-600 px-3 py-1 font-medium text-white">Act immediately</span>
+                  <span className="text-gray-600">Critical filing or compliance risk — resolve before claiming ITC.</span>
+                </span>
+                <span className="inline-flex max-w-[280px] flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                  <span className="shrink-0 rounded-full bg-amber-500 px-3 py-1 font-medium text-white">Follow up</span>
+                  <span className="text-gray-600">Supplier or books correction usually needed.</span>
+                </span>
+                <span className="inline-flex max-w-[280px] flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                  <span className="shrink-0 rounded-full bg-blue-600 px-3 py-1 font-medium text-white">Next month</span>
+                  <span className="text-gray-600">Timing or QRMP — expect resolution in a later period.</span>
+                </span>
+                <span className="inline-flex max-w-[280px] flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                  <span className="shrink-0 rounded-full bg-emerald-600 px-3 py-1 font-medium text-white">No action</span>
+                  <span className="text-gray-600">Matched or safe to claim as shown.</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

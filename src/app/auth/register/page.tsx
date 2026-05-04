@@ -6,6 +6,7 @@ import { AlertCircle, Check, Eye, EyeOff, X } from "lucide-react"
 
 import { GoogleIcon } from "@/components/auth/GoogleIcon"
 import { authCardClass, authInputClass } from "@/components/auth/auth-styles"
+import { BrandLogo } from "@/components/ui/BrandLogo"
 import { buttonVariants } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { mapAuthErrorMessage } from "@/lib/auth-errors"
@@ -165,15 +166,10 @@ export default function RegisterPage() {
   if (step === "success") {
     return (
       <>
-        <div className="mb-8 flex justify-center">
-          <Link href="/" className="flex items-center gap-2 text-brand-navy">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-navy text-sm font-bold text-white">
-              G
-            </span>
-            <span className="text-lg font-semibold">{appName}</span>
-          </Link>
-        </div>
         <div className={authCardClass}>
+          <div className="mb-8 flex justify-center">
+            <BrandLogo size="lg" linkToHome variant="dark" />
+          </div>
           <div className="gst-check-pop mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500">
             <Check className="h-10 w-10 text-white" strokeWidth={3} aria-hidden />
           </div>
@@ -232,16 +228,10 @@ export default function RegisterPage() {
 
   return (
     <>
-      <div className="mb-8 flex justify-center">
-        <Link href="/" className="flex items-center gap-2 text-brand-navy">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-navy text-sm font-bold text-white">
-            G
-          </span>
-          <span className="text-lg font-semibold">{appName}</span>
-        </Link>
-      </div>
-
       <div className={authCardClass}>
+        <div className="mb-8 flex justify-center">
+          <BrandLogo size="lg" linkToHome variant="dark" />
+        </div>
         <h1 className="text-2xl font-bold text-brand-navy">Create your account</h1>
         <p className="mt-1 text-sm text-muted-foreground">Free forever. No credit card required.</p>
 

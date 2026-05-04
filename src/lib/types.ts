@@ -1,11 +1,13 @@
 export type ITCStatus = "Y" | "N" | "T"
 export type MismatchStatus =
   | "Matched"
+  | "Sec 16(4) Expired"
   | "Value Mismatch"
   | "Tax Type Mismatch"
   | "Suggested Match"
   | "In 2B Only"
   | "In PR Only"
+  | "Period Timing Mismatch"
   | "QRMP Delay"
   | "Duplicate"
   | "RCM Invoice"
@@ -14,10 +16,40 @@ export type MismatchStatus =
   | "POS Mismatch"
   | "CESS Mismatch"
   | "Tax Rate Mismatch"
+  | "Date Gap Match"
+  | "Group Entity Match"
+  | "GSTIN Mismatch Match"
+  | "Amount-Led Match"
+  | "Consolidated Invoice Match"
+  | "Probable Month Match"
+  | "Unclaimed ITC"
+  | "ITC Eligibility Uncertain"
+  | "Debit Note Misclassified"
+  | "Partially Booked ITC"
+  | "ITC Reduced by Supplier"
+  | "Non-GST Entry"
 
 export type ITCBlockReason = "permanent" | "conditional" | null
 
-export type ITCRiskLevel = "Safe" | "Low" | "Medium" | "High" | "Critical"
+export type ITCRiskLevel = "Safe" | "Low" | "Medium" | "High" | "Critical" | "None"
+
+/** Internal check codes mapped to {@link MismatchStatus} labels (UI / docs). */
+export const RECONCILIATION_CHECK_CODES = {
+  SEC16: "Sec 16(4) Expired",
+  M3: "Date Gap Match",
+  M4_PAN: "Group Entity Match",
+  M4: "GSTIN Mismatch Match",
+  M5: "Amount-Led Match",
+  M6: "Consolidated Invoice Match",
+  P2: "Probable Month Match",
+  Q8: "Unclaimed ITC",
+  Q9: "ITC Eligibility Uncertain",
+  Q10: "Debit Note Misclassified",
+  Q14: "Partially Booked ITC",
+  I8: "ITC Reduced by Supplier",
+  PT: "Period Timing Mismatch",
+  X1: "Non-GST Entry",
+} as const satisfies Record<string, MismatchStatus>
 export type ActionUrgency =
   | "Immediate"
   | "Before Filing"
@@ -59,6 +91,8 @@ export interface GSTR2BRow {
   supprd?: string
   /** Same as `supprd` when the sheet column is labeled `supplierFilingPeriod` / filing period aliases. */
   supplierFilingPeriod?: string
+  /** Portal invoice date (`dt`) when mapped separately from `invoiceDate`. */
+  dt?: string
   invoiceDate: string
   invoiceValue: number
   placeOfSupply: string
@@ -89,6 +123,8 @@ export interface PurchaseRegisterRow {
   hsnCode?: string
   /** Optional explicit rate %; inferred in reconcile when missing */
   taxRate?: number
+  /** Booked ITC / ITC claimed in books from PR column (when present); used for Q-8 Unclaimed ITC. */
+  itcAmount?: number | null
 }
 
 export interface ReconciliationRow {

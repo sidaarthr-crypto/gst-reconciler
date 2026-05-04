@@ -28,6 +28,49 @@ const FILTER_OPTIONS: FilterOption[] = [
   { status: "ITC Blocked", label: "ITC Blocked", color: "red", dot: "#DC2626" },
   { status: "ITC Temporary", label: "ITC Temporary", color: "amber", dot: "#D97706" },
   { status: "CESS Mismatch", label: "CESS Mismatch", color: "amber", dot: "#D97706" },
+  { status: "Date Gap Match", label: "Date Gap Match", color: "green", dot: "#16A34A" },
+  { status: "Group Entity Match", label: "Group Entity Match", color: "green", dot: "#16A34A" },
+  { status: "GSTIN Mismatch Match", label: "GSTIN Mismatch Match", color: "amber", dot: "#D97706" },
+  { status: "Amount-Led Match", label: "Amount-Led Match", color: "amber", dot: "#D97706" },
+  { status: "Consolidated Invoice Match", label: "Consolidated Invoice Match", color: "green", dot: "#16A34A" },
+  { status: "Probable Month Match", label: "Probable Month Match", color: "amber", dot: "#CA8A04" },
+  { status: "Unclaimed ITC", label: "Unclaimed ITC", color: "orange", dot: "#EA580C" },
+  { status: "ITC Eligibility Uncertain", label: "ITC Eligibility Uncertain", color: "amber", dot: "#D97706" },
+  { status: "Debit Note Misclassified", label: "Debit Note Misclassified", color: "red", dot: "#DC2626" },
+  { status: "Partially Booked ITC", label: "Partially Booked ITC", color: "amber", dot: "#D97706" },
+  { status: "ITC Reduced by Supplier", label: "ITC Reduced by Supplier", color: "amber", dot: "#D97706" },
+  { status: "Non-GST Entry", label: "Non-GST Entry", color: "slate", dot: "#64748B" },
+]
+
+const FILTER_GROUPS: { heading: string; statuses: ReconciliationFilterId[] }[] = [
+  {
+    heading: "Advanced match",
+    statuses: [
+      "Date Gap Match",
+      "Group Entity Match",
+      "GSTIN Mismatch Match",
+      "Amount-Led Match",
+      "Consolidated Invoice Match",
+    ],
+  },
+  {
+    heading: "Probable",
+    statuses: ["Probable Month Match"],
+  },
+  {
+    heading: "Query",
+    statuses: [
+      "Unclaimed ITC",
+      "ITC Eligibility Uncertain",
+      "Debit Note Misclassified",
+      "Partially Booked ITC",
+      "ITC Reduced by Supplier",
+    ],
+  },
+  {
+    heading: "Excluded",
+    statuses: ["Non-GST Entry"],
+  },
 ]
 
 function matchesFilter(row: ReconciliationRow, filter: ReconciliationFilterId) {
@@ -97,6 +140,16 @@ export function FilterBar({
       count: results.filter((row) => row.status === option.status).length,
     }))
   }, [results])
+
+  const groupedStatusSet = useMemo(
+    () => new Set(FILTER_GROUPS.flatMap((g) => g.statuses)),
+    [],
+  )
+
+  const coreOptionCounts = useMemo(
+    () => optionCounts.filter((o) => !groupedStatusSet.has(o.status)),
+    [groupedStatusSet, optionCounts],
+  )
 
   const shownCount = useMemo(() => {
     return results.filter((row) => {
@@ -202,7 +255,7 @@ export function FilterBar({
             ) : null}
           </div>
           <div className="max-h-[340px] overflow-y-auto py-1">
-            {optionCounts.map((option) => {
+            {coreOptionCounts.map((option) => {
               const selected = activeSet.has(option.status)
               const styles = colorStyles(option.color)
               return (
@@ -242,6 +295,55 @@ export function FilterBar({
                 </button>
               )
             })}
+            {FILTER_GROUPS.map((group) => (
+              <div key={group.heading}>
+                <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  {group.heading}
+                </div>
+                {group.statuses.map((status) => {
+                  const option = optionCounts.find((o) => o.status === status)
+                  if (!option) return null
+                  const selected = activeSet.has(option.status)
+                  const styles = colorStyles(option.color)
+                  return (
+                    <button
+                      key={option.status}
+                      type="button"
+                      onClick={() => toggleFilter(option.status)}
+                      className={cn(
+                        "flex h-9 w-full items-center gap-3 px-3 text-left hover:bg-slate-50",
+                        option.count === 0 && "opacity-60",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm border",
+                          selected
+                            ? "border-brand-blue bg-brand-blue text-white"
+                            : "border-slate-300 bg-white text-transparent",
+                        )}
+                      >
+                        <Check size={10} />
+                      </span>
+                      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", styles.dot)} style={{ backgroundColor: option.dot }} />
+                      <span
+                        className={cn(
+                          "flex-1 text-sm font-medium text-slate-700",
+                          option.count === 0 && "italic text-slate-400",
+                        )}
+                      >
+                        {option.label}
+                      </span>
+                      {option.count > 0 ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-400">
+                          {option.count}
+                        </span>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
           </div>
           <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2.5">
             <p className="text-xs text-slate-500">

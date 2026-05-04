@@ -6,7 +6,7 @@ import { Copy, X } from "lucide-react"
 
 import { ActionBadge } from "@/components/reconcile/ActionBadge"
 import { RiskBadge } from "@/components/reconcile/RiskBadge"
-import { StatusBadge } from "@/components/reconcile/StatusBadge"
+import { StatusBadgeStrip } from "@/components/reconcile/StatusBadge"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { cn, formatINR, generateVendorMessage } from "@/lib/utils"
 import type { ReconciliationRow, VendorMessageContext } from "@/lib/types"
@@ -50,6 +50,7 @@ function riskAlertClass(row: ReconciliationRow) {
   if (row.itcRisk === "Critical") return "border-red-200 border-l-red-600 bg-red-50"
   if (row.itcRisk === "High") return "border-orange-200 border-l-orange-500 bg-orange-50"
   if (row.itcRisk === "Medium") return "border-amber-200 border-l-amber-500 bg-amber-50"
+  if (row.itcRisk === "None") return "border-slate-200 border-l-slate-400 bg-slate-50"
   return "border-emerald-200 border-l-emerald-500 bg-emerald-50"
 }
 
@@ -116,7 +117,7 @@ function DataPointRow({
 }) {
   return (
     <div className={cn("rounded-md border p-3", isMatch ? "border-slate-200 bg-slate-50/60" : "border-red-200 bg-red-50/60")}>
-      <p className="text-sm font-semibold text-slate-800">{icon} {label}</p>
+      <p className="text-base font-semibold text-slate-800">{icon} {label}</p>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
         <div>
           <p className="text-slate-500">GSTR-2B</p>
@@ -361,19 +362,19 @@ export function InvoiceDetailModal({
           >
             <X size={16} />
           </button>
-          <div className="flex items-start gap-2">
-            <RiskBadge row={row} />
-            <StatusBadge status={row.status} />
+          <div className="flex flex-col gap-2">
+            <RiskBadge row={row} variant="full" />
+            <StatusBadgeStrip row={row} />
           </div>
           <p className="mt-3 text-lg font-bold text-brand-navy">{row.supplierName}</p>
-          <p className="font-mono text-sm text-slate-500">{row.invoiceNumber}</p>
+          <p className="font-mono text-base text-slate-500">{row.invoiceNumber}</p>
           <p className="text-xs text-slate-500">{row.invoiceDate} · {row.placeOfSupply || "—"}</p>
         </div>
 
         <div className="space-y-5 px-5 py-4">
           <section>
             <h3 className="text-sm font-semibold text-brand-navy">Why This Is Flagged</h3>
-            <div className={cn("mt-2 rounded-md border border-l-4 p-3 text-sm leading-relaxed", riskAlertClass(row))}>
+            <div className={cn("mt-2 rounded-md border border-l-4 p-3 text-base leading-relaxed", riskAlertClass(row))}>
               {explanationForRow(row)}
             </div>
           </section>
@@ -615,7 +616,7 @@ export function InvoiceDetailModal({
           <section>
             <h3 className="text-sm font-semibold text-brand-navy">Invoice Data Comparison</h3>
             {row.status === "Duplicate" ? (
-              <div className="mb-3 mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+              <div className="mb-3 mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-base text-blue-700">
                 <p className="font-semibold">Why Your Books column shows —</p>
                 <p className="mt-1">
                   This is the duplicate (extra) occurrence of invoice {row.invoiceNumber} in
@@ -694,7 +695,7 @@ export function InvoiceDetailModal({
 
           <section>
             <h3 className="text-sm font-semibold text-brand-navy">What To Do</h3>
-            <div className="mt-2 rounded-md border border-slate-200 border-l-4 border-l-blue-500 bg-white p-3 text-sm leading-relaxed">
+            <div className="mt-2 rounded-md border border-slate-200 border-l-4 border-l-blue-500 bg-white p-3 text-base leading-relaxed">
               {row.status === "Duplicate"
                 ? `Invoice ${row.invoiceNumber} from supplier ${row.supplierGSTIN} appears twice in your GSTR-2B but only once in your Purchase Register.\n\nYour Purchase Register is correct.\n\nDo not claim ITC on this duplicate entry. Only claim ITC on the first matched occurrence of this invoice.`
                 : row.recommendedAction}
@@ -704,7 +705,13 @@ export function InvoiceDetailModal({
               <ActionBadge urgency={row.actionUrgency} />
               <span className="ml-2 font-semibold">ITC Claim Deadline:</span>
               <span>
-                {row.isDeadlineExpired ? "EXPIRED" : row.itcClaimDeadline || "—"}
+                {row.isDeadlineExpired
+                  ? "EXPIRED"
+                  : row.itcClaimDeadline
+                    ? row.daysToDeadline != null
+                      ? `${row.itcClaimDeadline} (${row.daysToDeadline} days)`
+                      : row.itcClaimDeadline
+                    : "—"}
               </span>
             </div>
           </section>

@@ -211,6 +211,9 @@ export function getRiskSortOrder(risk: ITCRiskLevel): number {
     case "Low":
       return 3
     case "Safe":
+      return 4
+    case "None":
+      return 5
     default:
       return 4
   }
@@ -221,6 +224,8 @@ export function getStatusSortPriority(status: MismatchStatus): number {
   switch (status) {
     case "Duplicate":
       return 1
+    case "Sec 16(4) Expired":
+      return 2
     case "QRMP Delay":
       return 98
     case "In PR Only":

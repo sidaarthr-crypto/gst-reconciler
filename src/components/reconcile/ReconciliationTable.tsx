@@ -3,15 +3,22 @@
 import { useEffect, useState } from "react"
 import { FileSearch, LayoutGrid, List } from "lucide-react"
 
+import {
+  highestItcRiskLevel,
+  primaryStatusSegment,
+  statusSegmentsExceptPrimary,
+  statusSegmentLabel,
+} from "@/components/reconcile/badge-display"
 import { EmptyState } from "@/components/reconcile/EmptyState"
 import { FilterBar } from "@/components/reconcile/FilterBar"
 import { InvoiceDetailModal } from "@/components/reconcile/InvoiceDetailModal"
-import { RiskBadge } from "@/components/reconcile/RiskBadge"
 import { StatusBadge } from "@/components/reconcile/StatusBadge"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SupplierView } from "@/components/reconcile/SupplierView"
 import { cn, formatINR } from "@/lib/utils"
 import type {
   ActionUrgency,
+  ITCRiskLevel,
   ReconciliationFilterId,
   ReconciliationRow,
   VendorMessageContext,
@@ -25,6 +32,136 @@ export type ReconciliationTableFilterBarProps = {
   activeUrgencies: ActionUrgency[]
   onChange: (next: ReconciliationFilterId[]) => void
   onUrgencyChange: (next: ActionUrgency[]) => void
+}
+
+const STATUS_BADGE_TABLE_CLASS =
+  "h-auto min-h-0 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap border-border"
+
+/** Only these words may appear in the RISK column (Safe maps to Low for display). */
+const VALID_RISK_LEVELS = new Set(["Critical", "High", "Medium", "Low", "None"])
+
+/** Strip risk-tier words from STATUS “+N more” counts and tooltips. */
+const STATUS_LABEL_EXCLUSIONS = new Set(["Critical", "High", "Medium", "Low", "None"])
+
+const RISK_PILL_STYLES: Record<
+  ITCRiskLevel,
+  { dot: string; pill: string }
+> = {
+  Critical: {
+    dot: "bg-risk-critical",
+    pill: "bg-risk-critical-bg text-risk-critical",
+  },
+  High: {
+    dot: "bg-risk-high",
+    pill: "bg-risk-high-bg text-risk-high",
+  },
+  Medium: {
+    dot: "bg-risk-medium",
+    pill: "bg-risk-medium-bg text-risk-medium",
+  },
+  Low: {
+    dot: "bg-sky-500",
+    pill: "bg-sky-50 text-sky-900",
+  },
+  Safe: {
+    dot: "bg-risk-safe",
+    pill: "bg-risk-safe-bg text-risk-safe",
+  },
+  None: {
+    dot: "bg-slate-400",
+    pill: "bg-slate-100 text-slate-600",
+  },
+}
+
+function riskLevelDisplayWord(level: ITCRiskLevel): string {
+  if (level === "Safe") return "Low"
+  return level
+}
+
+/** Distinct risk-tier labels for this row (status/POS/duplicate are not included). */
+function distinctTableRiskLabels(row: ReconciliationRow): string[] {
+  const labels = new Set<string>()
+  labels.add(riskLevelDisplayWord(row.itcRisk))
+  labels.add(riskLevelDisplayWord(highestItcRiskLevel(row)))
+  return [...labels].filter((l) => VALID_RISK_LEVELS.has(l))
+}
+
+function TableRiskLevelPill({ level }: { level: ITCRiskLevel }) {
+  const s = RISK_PILL_STYLES[level]
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-max shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+        s.pill,
+      )}
+    >
+      <span className={cn("h-2 w-2 shrink-0 rounded-full", s.dot)} />
+      {riskLevelDisplayWord(level)}
+    </span>
+  )
+}
+
+/** RISK column: only ITC risk tiers; “+N more” only when 2+ distinct risk levels (never POS/status). */
+function CompactRiskCell({ row }: { row: ReconciliationRow }) {
+  const primaryLevel = highestItcRiskLevel(row)
+  const distinctLabels = distinctTableRiskLabels(row)
+  const primaryWord = riskLevelDisplayWord(primaryLevel)
+  const otherRiskLabels = distinctLabels.filter((l) => l !== primaryWord)
+
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <TableRiskLevelPill level={primaryLevel} />
+      {otherRiskLabels.length > 0 ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="cursor-help text-[10px] font-medium text-slate-400">
+                +{otherRiskLabels.length} more
+              </span>
+            }
+          />
+          <TooltipContent>{otherRiskLabels.join(", ")}</TooltipContent>
+        </Tooltip>
+      ) : null}
+    </span>
+  )
+}
+
+function CompactStatusCell({ row }: { row: ReconciliationRow }) {
+  const primary = primaryStatusSegment(row)
+  const rest = statusSegmentsExceptPrimary(row)
+  const restStatusLabels = rest
+    .map((s) => statusSegmentLabel(s))
+    .filter((label) => !STATUS_LABEL_EXCLUSIONS.has(label))
+
+  const primaryNode =
+    primary.kind === "sec16" ? (
+      <StatusBadge
+        status="Duplicate"
+        labelOverride="Sec 16(4) Expired"
+        className={STATUS_BADGE_TABLE_CLASS}
+      />
+    ) : (
+      <StatusBadge status={primary.status} className={STATUS_BADGE_TABLE_CLASS} />
+    )
+
+  return (
+    <span className="inline-flex max-w-[min(100%,10rem)] flex-col items-start gap-0.5">
+      <span className="inline-flex max-w-full shrink-0">{primaryNode}</span>
+      {restStatusLabels.length > 0 ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="cursor-help text-[10px] font-medium text-slate-400">
+                +{restStatusLabels.length} more
+              </span>
+            }
+          />
+          <TooltipContent>{restStatusLabels.join(", ")}</TooltipContent>
+        </Tooltip>
+      ) : null}
+    </span>
+  )
 }
 
 function UrgencyBadge({ urgency }: { urgency: ReconciliationRow["actionUrgency"] }) {
@@ -83,7 +220,7 @@ function InvoiceTable({
 
   return (
     <div className="relative w-full overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 bg-white max-h-[400px] lg:max-h-[600px]">
-      <table className="w-full table-fixed divide-y divide-slate-200 text-sm">
+      <table className="w-full table-fixed divide-y divide-slate-200 text-base">
         <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-500 uppercase [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]">
           <tr>
             <th className="w-20 whitespace-nowrap px-3 py-3">Risk</th>
@@ -101,7 +238,7 @@ function InvoiceTable({
             <tr>
               <td colSpan={8} className="py-12 text-center">
                 <FileSearch className="mx-auto mb-2 text-slate-300" size={32} />
-                <p className="text-sm text-slate-400">No invoices match this filter</p>
+                <p className="text-base text-slate-400">No invoices match this filter</p>
               </td>
             </tr>
           ) : null}
@@ -112,13 +249,14 @@ function InvoiceTable({
                 className={cn(
                   "h-14 border-b border-slate-100 transition-colors hover:bg-slate-50",
                   idx % 2 === 1 && "bg-slate-50/30",
+                  row.status === "Non-GST Entry" && "opacity-50 text-slate-500",
                 )}
               >
                 <td className="w-20 px-3 py-3 align-middle text-xs">
-                  <RiskBadge row={row} />
+                  <CompactRiskCell row={row} />
                 </td>
                 <td className="w-[140px] px-3 py-3 align-middle text-xs">
-                  <StatusBadge status={row.status} />
+                  <CompactStatusCell row={row} />
                 </td>
                 <td className="w-[110px] px-3 py-3 align-middle text-xs">
                   <UrgencyBadge urgency={row.actionUrgency} />
@@ -127,7 +265,7 @@ function InvoiceTable({
                   className="w-[170px] px-3 py-3 align-middle"
                   title={row.supplierName}
                 >
-                  <p className="truncate text-sm font-medium text-slate-800">{row.supplierName}</p>
+                  <p className="truncate text-base font-medium text-slate-800">{row.supplierName}</p>
                   <p className="truncate font-mono text-xs text-slate-400">{row.supplierGSTIN}</p>
                 </td>
                 <td className="w-[130px] px-3 py-3 align-middle font-mono text-xs truncate" title={row.invoiceNumber}>

@@ -27,8 +27,6 @@ export const metadata: Metadata = {
     "Upload your GSTR-2B and Purchase Register. Get ITC risk scores, mismatch details, and plain English actions instantly.",
   icons: {
     icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
   },
 }
 

@@ -14,11 +14,13 @@ export type SessionStatusDb =
 
 export type ReconciliationResultStatusDb =
   | "Matched"
+  | "Sec 16(4) Expired"
   | "Value Mismatch"
   | "Tax Type Mismatch"
   | "Suggested Match"
   | "In 2B Only"
   | "In PR Only"
+  | "Period Timing Mismatch"
   | "QRMP Delay"
   | "Duplicate"
   | "RCM Invoice"
@@ -27,8 +29,20 @@ export type ReconciliationResultStatusDb =
   | "POS Mismatch"
   | "CESS Mismatch"
   | "Tax Rate Mismatch"
+  | "Date Gap Match"
+  | "Group Entity Match"
+  | "GSTIN Mismatch Match"
+  | "Amount-Led Match"
+  | "Consolidated Invoice Match"
+  | "Probable Month Match"
+  | "Unclaimed ITC"
+  | "ITC Eligibility Uncertain"
+  | "Debit Note Misclassified"
+  | "Partially Booked ITC"
+  | "ITC Reduced by Supplier"
+  | "Non-GST Entry"
 
-export type ItcRiskDb = "Safe" | "Low" | "Medium" | "High" | "Critical"
+export type ItcRiskDb = "Safe" | "Low" | "Medium" | "High" | "Critical" | "None"
 
 export type ActionUrgencyDb =
   | "Immediate"

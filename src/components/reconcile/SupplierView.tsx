@@ -65,6 +65,7 @@ const RISK_RANK: Record<ITCRiskLevel, number> = {
   Medium: 2,
   Low: 3,
   Safe: 4,
+  None: 5,
 }
 
 function stateFromGstin(gstin: string): { stateCode: string; stateName: string } {
@@ -240,7 +241,7 @@ function MiniInvoiceTable({
             >
               <td className="px-2 py-1.5 align-top">
                 <div className="origin-left scale-[0.92]">
-                  <RiskBadge row={row} />
+                  <RiskBadge row={row} variant="compact" />
                 </div>
               </td>
               <td className="px-2 py-1.5 align-top">
@@ -433,7 +434,7 @@ export function SupplierView({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2.5">
-                      <RiskBadge row={syntheticRowForRisk(g.worstRisk)} />
+                      <RiskBadge row={syntheticRowForRisk(g.worstRisk)} variant="compact" />
                       <span className="text-[15px] font-semibold text-brand-navy">{g.supplierName}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">

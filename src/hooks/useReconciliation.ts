@@ -575,13 +575,23 @@ export function useReconciliation(
           })
           const saved = (await saveRes.json()) as { ok?: boolean; error?: string }
           if (!saveRes.ok) {
-            console.error(
-              "[sessions] background save failed:",
-              saved.error ?? saveRes.status,
-            )
+            const detail =
+              typeof saved.error === "string" && saved.error.length > 0
+                ? saved.error
+                : `Request failed (${saveRes.status})`
+            console.error("[sessions] background save failed:", detail)
+            toast.error("Could not save reconciliation to your account", {
+              description: `${detail} — your results on this page are still valid.`,
+              duration: 8000,
+            })
           }
         } catch (err) {
           console.error("[sessions] background save error:", err)
+          toast.error("Could not save reconciliation to your account", {
+            description:
+              err instanceof Error ? err.message : "Network or server error while saving.",
+            duration: 8000,
+          })
         }
       })()
     } catch (e) {

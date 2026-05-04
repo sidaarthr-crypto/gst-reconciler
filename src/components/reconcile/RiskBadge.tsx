@@ -1,5 +1,9 @@
-import { ArrowLeftRight, Clock, Copy, MapPin } from "lucide-react"
-
+import {
+  buildRiskSegmentKinds,
+  highestItcRiskLevel,
+  riskSegmentLabel,
+} from "@/components/reconcile/badge-display"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { ITCRiskLevel, ReconciliationRow } from "@/lib/types"
 
@@ -32,107 +36,65 @@ const styles: Record<
     pill: "bg-risk-safe-bg text-risk-safe",
     text: "text-risk-safe",
   },
+  None: {
+    dot: "bg-slate-400",
+    pill: "bg-slate-100 text-slate-600",
+    text: "text-slate-600",
+  },
 }
 
-function PosAddon() {
+/** Visible risk word only (never combined with status/check names). Safe maps to “Low” per product copy. */
+function riskLevelWord(level: ITCRiskLevel): string {
+  if (level === "Safe") return "Low"
+  return level
+}
+
+function RiskLevelPill({ level }: { level: ITCRiskLevel }) {
+  const s = styles[level]
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-        "bg-amber-100 text-amber-900",
+        "inline-flex max-w-max shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+        s.pill,
       )}
     >
-      <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-      POS
+      <span className={cn("h-2 w-2 shrink-0 rounded-full", s.dot)} />
+      {riskLevelWord(level)}
     </span>
   )
 }
 
-export function RiskBadge({ row }: { row: ReconciliationRow }) {
-  const posAddon = row.isPOSMismatch ? <PosAddon /> : null
+export function RiskBadge({
+  row,
+  variant = "full",
+}: {
+  row: ReconciliationRow
+  variant?: "full" | "compact"
+}) {
+  const kinds = buildRiskSegmentKinds(row)
+  const level = highestItcRiskLevel(row)
+  const restKinds = kinds.length > 1 ? kinds.slice(1) : []
+  const restLabels = restKinds.map((k) => riskSegmentLabel(k, row))
 
-  if (row.isDuplicate || row.status === "Duplicate") {
+  if (variant === "compact") {
     return (
-      <span className="inline-flex flex-wrap items-center gap-1">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-            "bg-risk-critical-bg text-risk-critical",
-          )}
-        >
-          <Copy className="h-3 w-3 shrink-0" aria-hidden />
-          Critical — Duplicate
-        </span>
-        {posAddon}
+      <span className="inline-flex flex-col items-start gap-0.5">
+        <RiskLevelPill level={level} />
+        {restLabels.length > 0 ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className="cursor-help text-[10px] font-medium text-slate-400">
+                  +{restLabels.length} more
+                </span>
+              }
+            />
+            <TooltipContent>{restLabels.join(", ")}</TooltipContent>
+          </Tooltip>
+        ) : null}
       </span>
     )
   }
 
-  if (row.isDeadlineExpired) {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-1">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-            "bg-risk-critical-bg text-risk-critical",
-          )}
-        >
-          <Clock className="h-3 w-3 shrink-0" aria-hidden />
-          Critical — Expired
-        </span>
-        {posAddon}
-      </span>
-    )
-  }
-
-  if (row.isDeadlineWarning && !row.isDeadlineExpired && row.daysToDeadline != null) {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-1">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-            "bg-risk-high-bg text-risk-high",
-          )}
-        >
-          <Clock className="h-3 w-3 shrink-0" aria-hidden />
-          High — {row.daysToDeadline} days left
-        </span>
-        {posAddon}
-      </span>
-    )
-  }
-
-  if (row.isTaxTypeMismatch || row.status === "Tax Type Mismatch") {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-1">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-            "bg-amber-100 text-amber-900",
-          )}
-        >
-          <ArrowLeftRight className="h-3 w-3 shrink-0" aria-hidden />
-          Tax Type
-        </span>
-        {posAddon}
-      </span>
-    )
-  }
-
-  const risk = row.itcRisk
-  const s = styles[risk]
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <span
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-          s.pill,
-        )}
-      >
-        <span className={cn("h-2 w-2 shrink-0 rounded-full", s.dot)} />
-        {risk}
-      </span>
-      {posAddon}
-    </span>
-  )
+  return <RiskLevelPill level={level} />
 }

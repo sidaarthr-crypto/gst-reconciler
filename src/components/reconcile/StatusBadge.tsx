@@ -1,8 +1,9 @@
 import { Clock } from "lucide-react"
 
+import { buildStatusSegments } from "@/components/reconcile/badge-display"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { MismatchStatus } from "@/lib/types"
+import type { MismatchStatus, ReconciliationRow } from "@/lib/types"
 
 const map: Record<
   MismatchStatus,
@@ -11,6 +12,10 @@ const map: Record<
   Matched: {
     className:
       "border-emerald-500/60 bg-transparent text-emerald-700 hover:bg-emerald-50",
+  },
+  "Sec 16(4) Expired": {
+    className:
+      "border-red-600/80 bg-transparent text-red-900 hover:bg-red-50",
   },
   "Value Mismatch": {
     className:
@@ -31,6 +36,10 @@ const map: Record<
   "In PR Only": {
     className:
       "border-orange-500/60 bg-transparent text-orange-800 hover:bg-orange-50",
+  },
+  "Period Timing Mismatch": {
+    className:
+      "border-sky-500/60 bg-transparent text-sky-900 hover:bg-sky-50",
   },
   "QRMP Delay": {
     className: "border-transparent bg-[#F1F5F9] text-[#475569] hover:bg-slate-200/80",
@@ -63,24 +72,102 @@ const map: Record<
     className:
       "border-amber-500/60 bg-transparent text-amber-900 hover:bg-amber-50",
   },
+  "Date Gap Match": {
+    className:
+      "border-emerald-500/60 bg-transparent text-emerald-700 hover:bg-emerald-50",
+  },
+  "Group Entity Match": {
+    className:
+      "border-emerald-500/60 bg-transparent text-emerald-700 hover:bg-emerald-50",
+  },
+  "GSTIN Mismatch Match": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-800 hover:bg-amber-50",
+  },
+  "Amount-Led Match": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-800 hover:bg-amber-50",
+  },
+  "Consolidated Invoice Match": {
+    className:
+      "border-emerald-500/60 bg-transparent text-emerald-700 hover:bg-emerald-50",
+  },
+  "Probable Month Match": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-800 hover:bg-amber-50",
+  },
+  "Unclaimed ITC": {
+    className:
+      "border-orange-500/60 bg-transparent text-orange-900 hover:bg-orange-50",
+  },
+  "ITC Eligibility Uncertain": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-900 hover:bg-amber-50",
+  },
+  "Debit Note Misclassified": {
+    className:
+      "border-red-600/70 bg-transparent text-red-800 hover:bg-red-50",
+  },
+  "Partially Booked ITC": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-800 hover:bg-amber-50",
+  },
+  "ITC Reduced by Supplier": {
+    className:
+      "border-amber-500/60 bg-transparent text-amber-800 hover:bg-amber-50",
+  },
+  "Non-GST Entry": {
+    className:
+      "border-slate-400/60 bg-transparent text-slate-600 hover:bg-slate-100",
+  },
 }
 
-export function StatusBadge({ status }: { status: MismatchStatus }) {
+export function StatusBadge({
+  status,
+  labelOverride,
+  className,
+}: {
+  status: MismatchStatus
+  /** Same styling as `status`; replaces visible text (e.g. Sec 16(4) using Duplicate tones). */
+  labelOverride?: string
+  /** Merged into the badge; use for layout contexts (e.g. reconcile table density). */
+  className?: string
+}) {
   if (status === "QRMP Delay") {
     return (
       <Badge
         variant="outline"
-        className={cn("whitespace-nowrap font-medium", map[status].className)}
+        className={cn("whitespace-nowrap font-medium", map[status].className, className)}
       >
         <Clock className="mr-1 h-3 w-3 shrink-0" aria-hidden />
-        QRMP — Monitor
+        {labelOverride ?? "QRMP Delay"}
       </Badge>
     )
   }
 
   return (
-    <Badge variant="outline" className={cn("whitespace-nowrap font-medium", map[status].className)}>
-      {status}
+    <Badge variant="outline" className={cn("whitespace-nowrap font-medium", map[status].className, className)}>
+      {labelOverride ?? status}
     </Badge>
+  )
+}
+
+/** Full detail: every applicable status flag for modal / detail views. */
+export function StatusBadgeStrip({ row }: { row: ReconciliationRow }) {
+  const segments = buildStatusSegments(row)
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {segments.map((seg, idx) =>
+        seg.kind === "sec16" ? (
+          <StatusBadge
+            key={`sec16-${idx}`}
+            status="Duplicate"
+            labelOverride="Section 16(4) expired"
+          />
+        ) : (
+          <StatusBadge key={`${seg.status}-${idx}`} status={seg.status} />
+        ),
+      )}
+    </div>
   )
 }

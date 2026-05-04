@@ -5,12 +5,11 @@ import Link from "next/link"
 import { AlertCircle, Check } from "lucide-react"
 
 import { authCardClass, authInputClass } from "@/components/auth/auth-styles"
+import { BrandLogo } from "@/components/ui/BrandLogo"
 import { buttonVariants } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { cn } from "@/lib/utils"
-
-const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "GSTRecon"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -75,16 +74,10 @@ export default function ForgotPasswordPage() {
 
   return (
     <>
-      <div className="mb-8 flex justify-center">
-        <Link href="/" className="flex items-center gap-2 text-brand-navy">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-navy text-sm font-bold text-white">
-            G
-          </span>
-          <span className="text-lg font-semibold">{appName}</span>
-        </Link>
-      </div>
-
       <div className={authCardClass}>
+        <div className="mb-8 flex justify-center">
+          <BrandLogo size="lg" linkToHome variant="dark" />
+        </div>
         {!done ? (
           <>
             <h1 className="text-2xl font-bold text-brand-navy">Reset your password</h1>

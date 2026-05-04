@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 
 import type { Database } from "@/lib/database.types"
 import type { GSTR2BRow, PurchaseRegisterRow, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 import { buildReconciliationSummary } from "@/lib/reconcile"
-import { supabase } from "@/lib/supabase"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { makeMatchKey, normaliseGSTIN, normaliseInvoiceNo } from "@/lib/utils"
 
@@ -121,13 +122,14 @@ function mapResultRow(
 }
 
 async function insertChunks<T extends Record<string, unknown>>(
+  sb: SupabaseClient<Database>,
   table: "gstr2b_invoices" | "purchase_register_invoices" | "reconciliation_results",
   rows: T[],
   chunkSize: number,
 ) {
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize)
-    const { error } = await supabase.from(table).insert(chunk as never)
+    const { error } = await sb.from(table).insert(chunk as never)
     if (error) {
       throw new Error(error.message)
     }
@@ -327,6 +329,8 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id: sessionId } = await ctx.params
+  const serverSb = await createServerSupabase()
+
   try {
     const body = (await req.json()) as {
       gstr2bRows: GSTR2BRow[]
@@ -346,11 +350,11 @@ export async function POST(
       mapResultRow(sessionId, body.requestId, r),
     )
 
-    await insertChunks("gstr2b_invoices", gstrInserts, 100)
-    await insertChunks("purchase_register_invoices", prInserts, 100)
-    await insertChunks("reconciliation_results", resultInserts, 100)
+    await insertChunks(serverSb, "gstr2b_invoices", gstrInserts, 100)
+    await insertChunks(serverSb, "purchase_register_invoices", prInserts, 100)
+    await insertChunks(serverSb, "reconciliation_results", resultInserts, 100)
 
-    const { error: uErr } = await supabase
+    const { error: uErr } = await serverSb
       .from("reconciliation_sessions")
       .update({
         status: "completed",
@@ -372,7 +376,7 @@ export async function POST(
     return NextResponse.json({ ok: true })
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error"
-    await supabase
+    await serverSb
       .from("reconciliation_sessions")
       .update({
         status: "failed",
