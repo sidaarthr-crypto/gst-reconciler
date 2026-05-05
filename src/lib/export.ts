@@ -40,13 +40,18 @@ function applyRowStyle(ws: XLSX.WorkSheet, rowIdx0: number, risk: string, colCou
 
 /** ITC Deadline (Sec 16(4)) column text — never "N/A" for expired rows when invoice date exists. */
 function formatDeadlineForExport(row: ReconciliationRow): string {
+  const inv = row.invoiceDate?.trim()
+  const computedFromInvoice = inv ? getITCDeadlineInfo(inv) : null
+  if (computedFromInvoice) {
+    if (computedFromInvoice.isExpired) {
+      return `EXPIRED - ${computedFromInvoice.deadlineStr}`
+    }
+    return `${computedFromInvoice.deadlineStr} (${computedFromInvoice.daysRemaining} days)`
+  }
+
   if (row.isDeadlineExpired) {
     const fromRow = row.itcClaimDeadline?.trim()
-    const fromInv =
-      !fromRow && row.invoiceDate?.trim()
-        ? getITCDeadlineInfo(row.invoiceDate.trim())?.deadlineStr
-        : null
-    const label = fromRow || fromInv
+    const label = fromRow
     return label ? `EXPIRED - ${label}` : "EXPIRED"
   }
   if (row.isDeadlineWarning && !row.isDeadlineExpired && row.itcClaimDeadline) {
@@ -54,16 +59,6 @@ function formatDeadlineForExport(row: ReconciliationRow): string {
   }
   if (row.itcClaimDeadline) {
     return `${row.itcClaimDeadline} (${row.daysToDeadline ?? 0} days)`
-  }
-  const inv = row.invoiceDate?.trim()
-  if (inv) {
-    const info = getITCDeadlineInfo(inv)
-    if (info) {
-      if (info.isExpired) {
-        return info.deadlineStr ? `EXPIRED - ${info.deadlineStr}` : "EXPIRED"
-      }
-      return `${info.deadlineStr} (${info.daysRemaining} days)`
-    }
   }
   return "N/A"
 }

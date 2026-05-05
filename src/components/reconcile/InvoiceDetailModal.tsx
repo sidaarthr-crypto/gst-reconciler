@@ -8,7 +8,7 @@ import { ActionBadge } from "@/components/reconcile/ActionBadge"
 import { RiskBadge } from "@/components/reconcile/RiskBadge"
 import { StatusBadgeStrip } from "@/components/reconcile/StatusBadge"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { cn, formatINR, generateVendorMessage } from "@/lib/utils"
+import { cn, formatINR, generateVendorMessage, getITCDeadlineInfo } from "@/lib/utils"
 import type { ReconciliationRow, VendorMessageContext } from "@/lib/types"
 
 function explanationForRow(row: ReconciliationRow): string {
@@ -347,6 +347,27 @@ export function InvoiceDetailModal({
       duplicateRisk: toNumber(row.igst2B) + toNumber(row.cgst2B) + toNumber(row.sgst2B),
     }
   }, [allRows, row])
+  const deadlineMeta = useMemo(() => {
+    if (!row) return null
+    const fromRow =
+      row.itcClaimDeadline && row.itcClaimDeadline.trim().length > 0
+        ? {
+            deadlineStr: row.itcClaimDeadline,
+            daysRemaining: row.daysToDeadline ?? null,
+            isExpired: row.isDeadlineExpired === true,
+          }
+        : null
+    if (fromRow) return fromRow
+    const inv = row.invoiceDate?.trim()
+    if (!inv) return null
+    const fallback = getITCDeadlineInfo(inv)
+    if (!fallback) return null
+    return {
+      deadlineStr: fallback.deadlineStr,
+      daysRemaining: fallback.daysRemaining,
+      isExpired: fallback.isExpired,
+    }
+  }, [row])
 
   if (!row) return null
 
@@ -704,15 +725,18 @@ export function InvoiceDetailModal({
               <span className="font-semibold">Urgency:</span>
               <ActionBadge urgency={row.actionUrgency} />
               <span className="ml-2 font-semibold">ITC Claim Deadline:</span>
-              <span>
-                {row.isDeadlineExpired
-                  ? "EXPIRED"
-                  : row.itcClaimDeadline
-                    ? row.daysToDeadline != null
-                      ? `${row.itcClaimDeadline} (${row.daysToDeadline} days)`
-                      : row.itcClaimDeadline
-                    : "—"}
-              </span>
+              {deadlineMeta ? (
+                <span className={cn(deadlineMeta.isExpired ? "font-semibold text-red-600" : "text-slate-700")}>
+                  {deadlineMeta.deadlineStr}
+                  {deadlineMeta.isExpired
+                    ? " — EXPIRED"
+                    : deadlineMeta.daysRemaining != null
+                      ? ` (${deadlineMeta.daysRemaining} days)`
+                      : ""}
+                </span>
+              ) : (
+                <span className="text-slate-400">—</span>
+              )}
             </div>
           </section>
 

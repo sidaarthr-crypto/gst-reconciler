@@ -341,34 +341,10 @@ function getITCDeadline(invoiceDate: string): {
   if (!invoiceDate) return null
 
   try {
-    let day: number
-    let month: number
-    let year: number
-
-    if (invoiceDate.includes("-")) {
-      const parts = invoiceDate.split("-")
-      if (parts[0].length === 4) {
-        year = Number.parseInt(parts[0], 10)
-        month = Number.parseInt(parts[1], 10)
-        day = Number.parseInt(parts[2], 10)
-      } else {
-        day = Number.parseInt(parts[0], 10)
-        month = Number.parseInt(parts[1], 10)
-        year = Number.parseInt(parts[2], 10)
-      }
-    } else if (invoiceDate.includes("/")) {
-      const parts = invoiceDate.split("/")
-      day = Number.parseInt(parts[0], 10)
-      month = Number.parseInt(parts[1], 10)
-      year = Number.parseInt(parts[2], 10)
-    } else {
-      return null
-    }
-
-    if (Number.isNaN(day) || Number.isNaN(month) || Number.isNaN(year)) {
-      return null
-    }
-
+    const parsed = parseInvoiceDateFlexible(invoiceDate)
+    if (!parsed) return null
+    const month = parsed.getMonth() + 1
+    const year = parsed.getFullYear()
     const fyEndYear = month >= 4 ? year + 1 : year
     const deadline = new Date(fyEndYear, 10, 30)
 
@@ -391,11 +367,20 @@ function getITCDeadline(invoiceDate: string): {
   }
 }
 
-function shouldComputeITCDeadline(status: MismatchStatus): boolean {
-  if (status === "Duplicate" || status === "Non-GST Entry") {
-    return false
+function resolveInvoiceDateForDeadline(
+  b2b: GSTR2BRow | undefined,
+  pr: PurchaseRegisterRow | undefined,
+): string {
+  const candidates = [
+    (b2b ? getB2bInvoiceDateForMatching(b2b) : "").trim(),
+    (pr?.invoiceDate ?? "").trim(),
+    (b2b?.invoiceDate ?? "").trim(),
+  ]
+  for (const value of candidates) {
+    if (!value) continue
+    if (parseInvoiceDateFlexible(value)) return value
   }
-  return true
+  return candidates.find((value) => value.length > 0) ?? ""
 }
 
 function applyITCDeadlineFieldsAndEscalation(
@@ -406,7 +391,7 @@ function applyITCDeadlineFieldsAndEscalation(
   extras: ReturnType<typeof defaultRowFields>,
   mut: { itcRisk: ITCRiskLevel; action: string },
 ): void {
-  if (!shouldComputeITCDeadline(status) || !invoiceDateStr.trim()) return
+  if (!invoiceDateStr.trim()) return
   const meta = getITCDeadline(invoiceDateStr.trim())
   if (!meta) return
 
@@ -1983,7 +1968,7 @@ export async function reconcileB2B(
       const sum2bTax = best.b2b.igst + best.b2b.cgst + best.b2b.sgst
       const deadlineNoticeAmt = totalITCAtRisk > 0 ? totalITCAtRisk : sum2bTax
 
-      const invDate = (pr.invoiceDate || best.b2b.invoiceDate || "").trim()
+    const invDate = resolveInvoiceDateForDeadline(best.b2b, pr)
       const mut = { itcRisk, action }
       applyITCDeadlineFieldsAndEscalation(rowStatus, invDate, deadlineNoticeAmt, extras, mut)
       itcRisk = mut.itcRisk
@@ -2176,7 +2161,7 @@ export async function reconcileB2B(
     const deadlineNoticeAmt =
       totalITCAtRisk > 0 ? totalITCAtRisk : sum2bForNotice > 0 ? sum2bForNotice : sumPrForNotice
 
-    const invForDeadline = (pr?.invoiceDate || b2b?.invoiceDate || "").trim()
+    const invForDeadline = resolveInvoiceDateForDeadline(b2b, pr)
     const mutMain = { itcRisk, action: recommendedAction }
     applyITCDeadlineFieldsAndEscalation(status, invForDeadline, deadlineNoticeAmt, extras, mutMain)
     itcRisk = mutMain.itcRisk
