@@ -53,7 +53,13 @@ export function BrandLogo({ linkToHome = true, size = "md", variant = "dark" }: 
       </svg>
       <div className="flex flex-col leading-none gap-0.5">
         <span className={cn(s.name, "font-bold tracking-tight", nameClass)}>GSTRecon</span>
-        <span className={cn(s.sub, "font-medium uppercase tracking-[0.15em]", subClass)}>
+        <span
+          className={cn(
+            s.sub,
+            "hidden font-medium uppercase tracking-[0.15em] sm:block",
+            subClass,
+          )}
+        >
           GST Reconciliation
         </span>
       </div>

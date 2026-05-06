@@ -68,11 +68,15 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 body {
   font-family: 'DM Sans', sans-serif;
   font-size: 16px;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 .font-sora { font-family: 'Sora', sans-serif; }

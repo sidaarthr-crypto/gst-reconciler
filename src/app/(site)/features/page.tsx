@@ -234,7 +234,7 @@ export default function FeaturesPage() {
           <p className="mb-4 inline-flex rounded-full bg-brand-blue/10 px-3 py-1 text-xs font-semibold text-brand-blue">
             Version 1.0 — B2B Invoices
           </p>
-          <h1 className="text-[32px] font-bold leading-tight text-brand-navy">
+          <h1 className="text-3xl font-bold leading-tight text-brand-navy md:text-[32px] lg:text-4xl">
             What GSTRecon Reconciles For You
           </h1>
           <p className="mt-4 max-w-2xl text-base text-slate-600">
@@ -354,7 +354,7 @@ export default function FeaturesPage() {
           <p className="mt-2 text-base text-slate-600">
             Every invoice is assigned a risk level based on GST rules.
           </p>
-          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 emoji: "🔴",

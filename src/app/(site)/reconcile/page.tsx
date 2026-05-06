@@ -262,7 +262,7 @@ export default function ReconcilePage() {
 
       <div className="flex flex-col gap-4 border-b border-border pb-8 md:flex-row md:items-start md:justify-between md:gap-6">
         <div>
-          <h1 className="text-[28px] font-bold text-brand-navy">
+          <h1 className="text-3xl font-bold text-brand-navy md:text-[28px] lg:text-[30px]">
             GSTR-2B Reconciliation
           </h1>
           <p className="mt-1 text-muted-foreground">

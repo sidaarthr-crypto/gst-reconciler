@@ -118,7 +118,7 @@ function DataPointRow({
   return (
     <div className={cn("rounded-md border p-3", isMatch ? "border-slate-200 bg-slate-50/60" : "border-red-200 bg-red-50/60")}>
       <p className="text-base font-semibold text-slate-800">{icon} {label}</p>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+      <div className="mt-2 grid grid-cols-1 gap-3 text-xs sm:grid-cols-3 sm:gap-2">
         <div>
           <p className="text-slate-500">GSTR-2B</p>
           <p className={cn("font-medium", isMatch ? "text-slate-600" : "text-red-700")}>{value2B}</p>
@@ -373,11 +373,11 @@ export function InvoiceDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent className="inset-0 h-[100dvh] max-h-[100dvh] w-full max-w-none overflow-y-auto rounded-none p-0 md:inset-auto md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl">
-        <div className="sticky top-0 z-20 border-b border-slate-200 bg-white px-5 py-4">
+      <DialogContent className="inset-0 h-[100dvh] max-h-[100dvh] w-full max-w-none overflow-y-auto rounded-none p-0 md:inset-auto md:mx-auto md:my-auto md:h-auto md:max-h-[90vh] md:w-[95vw] md:max-w-[min(700px,95vw)] md:rounded-xl">
+        <div className="sticky top-0 z-20 border-b border-slate-200 bg-white px-5 py-4 md:rounded-t-xl">
           <button
             type="button"
-            className="absolute top-3 right-3 rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            className="absolute top-2 right-2 flex min-h-11 min-w-11 items-center justify-center rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 md:top-3 md:right-3 md:min-h-0 md:min-w-0"
             onClick={onClose}
             aria-label="Close"
           >
@@ -650,8 +650,8 @@ export function InvoiceDetailModal({
                 </p>
               </div>
             ) : null}
-            <div className="mt-2 overflow-hidden rounded-lg border border-slate-200">
-              <table className="w-full text-xs">
+            <div className="mt-2 max-w-full overflow-x-auto rounded-lg border border-slate-200 [-webkit-overflow-scrolling:touch]">
+              <table className="min-w-[520px] w-full text-xs">
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold">Field</th>
@@ -770,17 +770,17 @@ export function InvoiceDetailModal({
           ) : null}
         </div>
 
-        <div className="sticky bottom-0 flex items-center justify-between border-t border-slate-200 bg-white px-5 py-3">
-          <p className="text-xs text-slate-400">
+        <div className="sticky bottom-0 flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex-row md:items-center md:justify-between md:rounded-b-xl">
+          <p className="text-center text-xs text-slate-400 md:text-left">
             Invoice {allRows.length === 0 ? 0 : currentIndex + 1} of {allRows.length}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end">
             <button
               type="button"
               disabled={!canPrev}
               onClick={() => onNavigate("prev")}
               className={cn(
-                "rounded border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700",
+                "min-h-11 w-full rounded border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 md:w-auto md:min-h-0 md:py-1.5",
                 !canPrev && "opacity-40",
               )}
             >
@@ -791,7 +791,7 @@ export function InvoiceDetailModal({
               disabled={!canNext}
               onClick={() => onNavigate("next")}
               className={cn(
-                "rounded border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700",
+                "min-h-11 w-full rounded border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 md:w-auto md:min-h-0 md:py-1.5",
                 !canNext && "opacity-40",
               )}
             >

@@ -7,5 +7,5 @@ export const authInputClass = cn(
 )
 
 export const authCardClass = cn(
-  "mx-4 rounded-none border-0 border-t-[4px] border-t-brand-navy bg-white p-6 shadow-none md:mx-0 md:rounded-2xl md:border md:p-10 md:shadow-[0_4px_24px_rgba(0,0,0,0.08)]",
+  "w-full max-w-full rounded-none border-0 border-t-[4px] border-t-brand-navy bg-white p-6 shadow-none sm:rounded-2xl sm:border sm:shadow-[0_4px_24px_rgba(0,0,0,0.08)] md:p-10",
 )

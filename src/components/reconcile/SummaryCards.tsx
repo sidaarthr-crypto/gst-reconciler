@@ -74,27 +74,27 @@ export function SummaryCards({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Card className="border-border shadow-sm">
-          <CardContent className="flex gap-4 p-5">
-            <FileText className="h-8 w-8 shrink-0 text-brand-blue" aria-hidden />
-            <div>
-              <p className="text-4xl font-semibold text-brand-navy">
+          <CardContent className="flex gap-3 p-4 sm:gap-4 sm:p-5">
+            <FileText className="h-7 w-7 shrink-0 text-brand-blue sm:h-8 sm:w-8" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold tabular-nums text-brand-navy lg:text-4xl">
                 {summary.totalInvoices}
               </p>
-              <p className="text-base text-muted-foreground">B2B invoices processed</p>
+              <p className="text-xs text-muted-foreground sm:text-base">B2B invoices processed</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-border shadow-sm">
-          <CardContent className="flex gap-4 p-5">
-            <ShieldCheck className="h-8 w-8 shrink-0 text-risk-safe" aria-hidden />
-            <div>
-              <p className="text-4xl font-semibold text-risk-safe">
+          <CardContent className="flex gap-3 p-4 sm:gap-4 sm:p-5">
+            <ShieldCheck className="h-7 w-7 shrink-0 text-risk-safe sm:h-8 sm:w-8" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold tabular-nums text-risk-safe lg:text-4xl">
                 {summary.matchedCount}
               </p>
-              <p className="text-base text-risk-safe">
+              <p className="text-xs text-risk-safe sm:text-base">
                 {formatINR(summary.totalITCSafe)} safe to claim
               </p>
             </div>
@@ -102,12 +102,12 @@ export function SummaryCards({
         </Card>
 
         <Card className="border-border shadow-sm">
-          <CardContent className="flex gap-4 p-5">
-            <AlertTriangle className="h-8 w-8 shrink-0 text-risk-medium" aria-hidden />
-            <div>
-              <p className="text-4xl font-semibold text-risk-medium">{issuesCount}</p>
-              <p className="text-base text-muted-foreground">Issues Found</p>
-              <p className="text-base text-risk-medium">
+          <CardContent className="flex gap-3 p-4 sm:gap-4 sm:p-5">
+            <AlertTriangle className="h-7 w-7 shrink-0 text-risk-medium sm:h-8 sm:w-8" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold tabular-nums text-risk-medium lg:text-4xl">{issuesCount}</p>
+              <p className="text-xs text-muted-foreground sm:text-base">Issues Found</p>
+              <p className="text-xs text-risk-medium sm:text-base">
                 {formatINR(summary.totalITCAtRisk)} at risk
               </p>
             </div>
@@ -115,10 +115,10 @@ export function SummaryCards({
         </Card>
 
         <Card className="border-border shadow-sm">
-          <CardContent className="flex gap-4 p-5">
-            <FileX className="h-8 w-8 shrink-0 text-risk-high" aria-hidden />
-            <div>
-              <p className="text-4xl font-semibold text-risk-high">{missingOnly}</p>
+          <CardContent className="flex gap-3 p-4 sm:gap-4 sm:p-5">
+            <FileX className="h-7 w-7 shrink-0 text-risk-high sm:h-8 sm:w-8" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-2xl font-semibold tabular-nums text-risk-high lg:text-4xl">{missingOnly}</p>
               <p className="text-xs text-muted-foreground">
                 2B only: {in2BOnlyDisplay} &nbsp;|&nbsp; PR only: {inPROnlyDisplay}
               </p>
@@ -127,9 +127,9 @@ export function SummaryCards({
         </Card>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card
-          className={`min-h-[140px] border-border border-l-4 border-l-risk-critical shadow-sm ${itcAtRiskOnlyRow2 ? "md:col-span-3" : ""}`}
+          className={`min-h-[140px] border-border border-l-4 border-l-risk-critical shadow-sm ${itcAtRiskOnlyRow2 ? "sm:col-span-3" : ""}`}
         >
           <CardContent className="flex items-start gap-4 p-5">
             <AlertOctagon className="h-8 w-8 shrink-0 text-risk-critical" aria-hidden />

@@ -8,22 +8,22 @@ type FeaturesProps = {
 
 export function Features({ onViewAllChecks }: FeaturesProps) {
   return (
-    <section id="features" className="bg-slate-50 px-12 py-24">
-      <div className="mx-auto max-w-6xl">
+    <section id="features" className="bg-slate-50 py-12 md:py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="anim-fade-up">
           <p className="mb-2 text-[12px] font-bold uppercase tracking-[2px] text-[#1447E6]">FEATURES</p>
-          <h2 className="font-sora mb-2 text-4xl font-bold tracking-[-0.6px] text-[#0F1C2E]">
+          <h2 className="font-sora mb-2 text-2xl font-bold tracking-[-0.6px] text-[#0F1C2E] md:text-3xl lg:text-4xl">
             Built for CAs. Designed for real GST compliance.
           </h2>
-          <p className="mb-8 text-base leading-relaxed text-gray-600">
+          <p className="mb-8 text-sm leading-relaxed text-gray-600 sm:text-base">
             Every invoice scored, categorised, and given a plain-English action — before you file GSTR-3B.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-12 md:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12">
           <div className="anim-fade-left">
             <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[.8px] text-slate-400">ITC RISK LEVELS</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
                 ["Critical", "ITC blocked or permanently denied. Cannot claim under any scenario.", "bg-red-600 text-white", "border-l-red-600", "Act immediately", "#DC2626", "text-red-700"],
                 ["High", "Invoice missing from 2B. Supplier hasn't filed. ITC at risk this period.", "bg-amber-500 text-white", "border-l-amber-600", "Follow up now", "#D97706", "text-amber-700"],
@@ -42,7 +42,7 @@ export function Features({ onViewAllChecks }: FeaturesProps) {
                   <span className={`mt-2 inline-block rounded px-4 py-1.5 text-[10px] font-bold ${pill}`}>{badge}</span>
                 </div>
               ))}
-              <div className="col-span-2 flex min-h-[120px] items-start justify-between rounded-xl border border-slate-200 border-l-4 border-l-emerald-700 bg-white p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_4px_16px_rgba(15,28,46,.08)]">
+              <div className="col-span-full flex min-h-[120px] flex-col gap-4 rounded-xl border border-slate-200 border-l-4 border-l-emerald-700 bg-white p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_4px_16px_rgba(15,28,46,.08)] sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="mb-1.5 flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-emerald-600" />
@@ -52,7 +52,7 @@ export function Features({ onViewAllChecks }: FeaturesProps) {
                     Fully matched and verified. ITC claimable without any action required.
                   </p>
                 </div>
-                <span className="ml-4 flex-shrink-0 rounded bg-emerald-600 px-4 py-1.5 text-[10px] font-bold text-white">
+                <span className="w-fit flex-shrink-0 self-start rounded bg-emerald-600 px-4 py-1.5 text-[10px] font-bold text-white sm:self-center">
                   No action needed
                 </span>
               </div>
@@ -61,14 +61,14 @@ export function Features({ onViewAllChecks }: FeaturesProps) {
 
           <div id="recon" className="anim-fade-right">
             <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[.8px] text-slate-400">RECONCILIATION ENGINE</p>
-            <div className="rounded-xl border border-slate-200 bg-white p-8 animate-[borderGlow_3s_infinite]">
+            <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8 animate-[borderGlow_3s_infinite]">
               <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">WHAT WE DO</p>
-              <h3 className="font-sora mb-3 text-2xl font-bold text-[#0F1C2E]">28-Point Invoice Reconciliation</h3>
-              <p className="mb-5 text-base leading-relaxed text-slate-500">
+              <h3 className="font-sora mb-3 text-xl font-bold text-[#0F1C2E] md:text-2xl">28-Point Invoice Reconciliation</h3>
+              <p className="mb-5 text-sm leading-relaxed text-slate-500 sm:text-base">
                 Every B2B invoice is normalised, matched by GSTIN + Invoice Number, then compared across value, tax type, tax rate, ITC availability, place of supply, CESS, return period, RCM status, advanced matching, query checks, and exclusions — with a ₹1 tolerance built in.
               </p>
-              <div className="mb-5 flex items-baseline gap-2.5">
-                <span className="font-sora text-6xl font-bold leading-none text-[#1447E6]">28</span>
+              <div className="mb-5 flex flex-wrap items-baseline gap-2.5">
+                <span className="font-sora text-4xl font-bold leading-none text-[#1447E6] sm:text-5xl lg:text-6xl">28</span>
                 <span className="text-sm text-slate-400">diagnostic checks / per invoice</span>
               </div>
               <div className="mb-5 flex flex-wrap gap-2">
@@ -87,7 +87,7 @@ export function Features({ onViewAllChecks }: FeaturesProps) {
               <button
                 type="button"
                 onClick={onViewAllChecks}
-                className="w-full rounded-[9px] bg-[#0F1C2E] py-4 text-base font-semibold text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#1a3050] hover:shadow-[0_4px_14px_rgba(15,28,46,.2)]"
+                className="min-h-11 w-full rounded-[9px] bg-[#0F1C2E] py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#1a3050] hover:shadow-[0_4px_14px_rgba(15,28,46,.2)] sm:py-4 sm:text-base"
               >
                 View all 28 reconciliation checks →
               </button>

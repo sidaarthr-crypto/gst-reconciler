@@ -213,13 +213,13 @@ export function FilterBar({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center">
-        <div ref={rootRef} className="relative">
+      <div className="flex flex-col flex-wrap gap-2 sm:flex-row sm:items-center sm:gap-x-3">
+        <div ref={rootRef} className="relative w-full min-w-0 sm:w-auto sm:min-w-fit">
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
             className={cn(
-              "inline-flex min-h-11 w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:min-h-0 md:w-auto",
+              "inline-flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors sm:w-auto sm:min-w-fit md:min-h-0",
               activeFilters.length > 0
                 ? "border-brand-blue bg-brand-blue text-white"
                 : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
@@ -361,12 +361,12 @@ export function FilterBar({
           ) : null}
         </div>
 
-        <div ref={urgencyRef} className="relative">
+        <div ref={urgencyRef} className="relative w-full min-w-0 sm:w-auto sm:min-w-fit">
           <button
             type="button"
             onClick={() => setUrgencyOpen((prev) => !prev)}
             className={cn(
-              "inline-flex min-h-11 w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors md:min-h-0 md:w-auto",
+              "inline-flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors sm:w-auto sm:min-w-fit md:min-h-0",
               activeUrgencies.length > 0
                 ? "border-brand-blue bg-brand-blue text-white"
                 : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",

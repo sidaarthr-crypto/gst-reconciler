@@ -220,7 +220,7 @@ function MiniInvoiceTable({
   const visible = showAll ? rows : rows.slice(0, MINI_INITIAL)
   return (
     <div className="scroll-table-hint overflow-x-auto [-webkit-overflow-scrolling:touch]">
-      <table className="w-full min-w-[360px] border-collapse text-xs">
+      <table className="w-full min-w-[520px] border-collapse text-xs">
         <thead>
           <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
             <th className="px-2 py-2">Risk</th>

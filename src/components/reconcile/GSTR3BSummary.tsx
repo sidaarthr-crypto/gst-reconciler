@@ -109,7 +109,7 @@ export function GSTR3BSummary({ summary: s, period }: { summary: GSTR3BSummary; 
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50"
+        className="flex min-h-11 w-full items-center justify-between rounded-xl border border-border bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50"
       >
         <span className="text-[15px] font-semibold text-brand-navy">GSTR-3B ITC Summary</span>
         <ChevronDown
@@ -147,7 +147,7 @@ export function GSTR3BSummary({ summary: s, period }: { summary: GSTR3BSummary; 
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="flex flex-col rounded-lg border border-border">
               <div className="space-y-2 border-b border-border p-4">
                 <p className="text-[13px] font-semibold text-emerald-700">✓ Claim in Table 4A(5)</p>
@@ -216,13 +216,14 @@ export function GSTR3BSummary({ summary: s, period }: { summary: GSTR3BSummary; 
           </div>
 
           <div className="mt-6 rounded-lg border border-blue-100 bg-[#EFF6FF] px-4 py-4 sm:px-5">
-            <p className="text-lg font-bold text-brand-navy">
+            <p className="text-base font-bold text-brand-navy sm:text-lg">
               Net ITC to enter in GSTR-3B Table 4A(5): {formatINR(s.netClaimableTotal)}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              IGST: {formatINR(s.netClaimableIGST)} | CGST: {formatINR(s.netClaimableCGST)} | SGST:{" "}
-              {formatINR(s.netClaimableSGST)}
-            </p>
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground md:mt-1 md:flex md:flex-row md:flex-wrap md:gap-x-4 md:space-y-0 md:text-sm">
+              <p>IGST: {formatINR(s.netClaimableIGST)}</p>
+              <p>CGST: {formatINR(s.netClaimableCGST)}</p>
+              <p>SGST: {formatINR(s.netClaimableSGST)}</p>
+            </div>
           </div>
         </div>
       ) : null}

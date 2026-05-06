@@ -219,14 +219,16 @@ function InvoiceTable({
   }, [modalOpen, selectedIndex, rows.length])
 
   return (
-    <div className="relative w-full overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 bg-white max-h-[400px] lg:max-h-[600px]">
-      <table className="w-full table-fixed divide-y divide-slate-200 text-base">
+    <div className="relative max-w-full overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 bg-white [-webkit-overflow-scrolling:touch] max-h-[400px] lg:max-h-[600px]">
+      <table className="w-full min-w-[800px] table-auto divide-y divide-slate-200 text-base">
         <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-500 uppercase [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]">
           <tr>
-            <th className="w-20 whitespace-nowrap px-3 py-3">Risk</th>
-            <th className="w-[140px] whitespace-nowrap px-3 py-3">Status</th>
-            <th className="w-[110px] whitespace-nowrap px-3 py-3">Urgency</th>
-            <th className="w-[170px] whitespace-nowrap px-3 py-3">Supplier</th>
+            <th className="sticky left-0 z-30 w-20 whitespace-nowrap border-r border-slate-200 bg-slate-50 px-3 py-3 shadow-[2px_0_8px_-2px_rgba(15,28,46,0.06)]">
+              Risk
+            </th>
+            <th className="min-w-[140px] whitespace-nowrap px-3 py-3">Status</th>
+            <th className="min-w-[110px] whitespace-nowrap px-3 py-3">Urgency</th>
+            <th className="min-w-[170px] whitespace-nowrap px-3 py-3">Supplier</th>
             <th className="w-[130px] whitespace-nowrap px-3 py-3">Invoice No</th>
             <th className="w-[90px] whitespace-nowrap px-3 py-3">Invoice Date</th>
             <th className="w-[110px] whitespace-nowrap px-3 py-3 text-right">ITC At Risk</th>
@@ -247,12 +249,18 @@ function InvoiceTable({
               <tr
                 key={`${row.matchKey}-${row.invoiceNumber}-${idx}`}
                 className={cn(
-                  "h-14 border-b border-slate-100 transition-colors hover:bg-slate-50",
+                  "group min-h-[3.5rem] border-b border-slate-100 transition-colors hover:bg-slate-50",
                   idx % 2 === 1 && "bg-slate-50/30",
                   row.status === "Non-GST Entry" && "opacity-50 text-slate-500",
                 )}
               >
-                <td className="w-20 px-3 py-3 align-middle text-xs">
+                <td
+                  className={cn(
+                    "sticky left-0 z-10 w-20 border-r border-slate-200 px-3 py-3 align-middle text-xs shadow-[2px_0_8px_-2px_rgba(15,28,46,0.06)]",
+                    idx % 2 === 1 ? "bg-slate-50/30" : "bg-white",
+                    "group-hover:bg-slate-50",
+                  )}
+                >
                   <CompactRiskCell row={row} />
                 </td>
                 <td className="w-[140px] px-3 py-3 align-middle text-xs">
@@ -261,10 +269,7 @@ function InvoiceTable({
                 <td className="w-[110px] px-3 py-3 align-middle text-xs">
                   <UrgencyBadge urgency={row.actionUrgency} />
                 </td>
-                <td
-                  className="w-[170px] px-3 py-3 align-middle"
-                  title={row.supplierName}
-                >
+                <td className="min-w-[170px] px-3 py-3 align-middle" title={row.supplierName}>
                   <p className="truncate text-base font-medium text-slate-800">{row.supplierName}</p>
                   <p className="truncate font-mono text-xs text-slate-400">{row.supplierGSTIN}</p>
                 </td>
@@ -283,7 +288,7 @@ function InvoiceTable({
                 <td className="w-20 px-3 py-3 align-middle text-xs">
                   <button
                     type="button"
-                    className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    className="inline-flex min-h-11 min-w-[44px] items-center justify-center rounded-md text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800 hover:underline sm:min-h-0 sm:min-w-0 sm:justify-start sm:bg-transparent"
                     onClick={() => openModal(idx)}
                   >
                     Details →
@@ -402,8 +407,8 @@ export function ReconciliationTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
+        <div className="min-w-0 w-full flex-1 md:min-w-[200px]">
           <FilterBar
             results={filterBar.results}
             activeFilters={filterBar.activeFilters}

@@ -211,19 +211,19 @@ export default function HomePage() {
 
       {showModal && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(15,28,46,.75)] p-6"
+          className="fixed inset-0 z-[200] flex items-stretch justify-center bg-[rgba(15,28,46,.75)] p-0 sm:items-center sm:p-6"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowModal(false)
           }}
         >
-          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[14px] bg-white shadow-xl animate-[scaleIn_.2s_ease_both]">
-            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-slate-700 bg-[#0F1C2E] px-8 py-5">
-              <h3 className="font-sora text-[15px] font-bold text-white">All 28 Reconciliation Checks</h3>
-              <button type="button" className="text-[20px] text-slate-400 hover:text-white" onClick={() => setShowModal(false)}>✕</button>
+          <div className="flex max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none bg-white shadow-xl animate-[scaleIn_.2s_ease_both] sm:max-h-[90vh] sm:rounded-[14px]">
+            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-slate-700 bg-[#0F1C2E] px-4 py-4 sm:px-8 sm:py-5">
+              <h3 className="font-sora pr-8 text-sm font-bold text-white sm:text-[15px]">All 28 Reconciliation Checks</h3>
+              <button type="button" className="min-h-11 min-w-11 shrink-0 rounded text-xl text-slate-400 hover:text-white sm:min-h-0 sm:min-w-0" aria-label="Close" onClick={() => setShowModal(false)}>✕</button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-6">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="col-span-full -mx-8 border-y border-gray-200 bg-slate-50 px-8 py-3">
+                <div className="col-span-full -mx-4 border-y border-gray-200 bg-slate-50 px-4 py-3 sm:-mx-8 sm:px-8">
                   <p className={`text-xs font-bold uppercase tracking-widest ${FIRST_CHECKS_SECTION.labelClassName}`}>
                     {FIRST_CHECKS_SECTION.heading}
                   </p>
@@ -247,7 +247,7 @@ export default function HomePage() {
                   let cardNum = MODAL_ITEMS.length
                   return MODAL_EXTRA_SECTIONS.map((section) => (
                     <Fragment key={section.heading}>
-                      <div className="col-span-full -mx-8 border-y border-gray-200 bg-slate-50 px-8 py-3">
+                      <div className="col-span-full -mx-4 border-y border-gray-200 bg-slate-50 px-4 py-3 sm:-mx-8 sm:px-8">
                         <p className={`text-xs font-bold uppercase tracking-widest ${section.labelClassName}`}>
                           {section.heading}
                         </p>
@@ -275,7 +275,7 @@ export default function HomePage() {
                 })()}
               </div>
             </div>
-            <div className="sticky bottom-0 z-10 shrink-0 border-t border-gray-200 bg-white px-8 py-4">
+            <div className="sticky bottom-0 z-10 shrink-0 border-t border-gray-200 bg-white px-4 py-4 sm:px-8">
               <p className="mb-3 text-xs font-semibold text-gray-700">What the urgency badges mean</p>
               <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs text-gray-600">
                 <span className="inline-flex max-w-[280px] flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
@@ -300,12 +300,12 @@ export default function HomePage() {
         </div>
       )}
 
-      <section id="security" className="relative overflow-hidden bg-[#0F1C2E] px-12 py-20">
+      <section id="security" className="relative overflow-x-hidden bg-[#0F1C2E] py-12 md:py-16 lg:py-20">
         <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[.07]" style={{ backgroundImage: "radial-gradient(circle,#60A5FA 1px,transparent 1px)", backgroundSize: "28px 28px" }} />
-        <div className="relative z-10 mx-auto max-w-6xl">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="anim-fade-up">
             <p className="mb-2 text-[12px] font-bold uppercase tracking-[2px] text-[#60A5FA]">DATA SECURITY</p>
-            <h2 className="font-sora mb-3 text-[30px] font-extrabold tracking-tight text-white">Your client data is protected at every step.</h2>
+            <h2 className="font-sora mb-3 text-2xl font-extrabold tracking-tight text-white md:text-3xl lg:text-[30px]">Your client data is protected at every step.</h2>
             <p className="mb-8 max-w-[580px] text-[15px] leading-relaxed text-slate-400">Raw invoice files are never uploaded to our servers. Reconciliation runs in your browser. Only the results are saved — encrypted at rest, isolated to your account, protected by row-level security.</p>
           </div>
 
@@ -365,11 +365,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="history" className="bg-white px-12 py-20">
-        <div className="mx-auto max-w-6xl">
+      <section id="history" className="overflow-x-hidden bg-white py-12 md:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="anim-fade-up">
             <p className="mb-2 text-[12px] font-bold uppercase tracking-[2px] text-[#1447E6]">RECONCILIATION HISTORY</p>
-            <h2 className="font-sora mb-2 text-[30px] font-extrabold text-[#0F1C2E]">Every run. Logged. Traceable.</h2>
+            <h2 className="font-sora mb-2 text-2xl font-extrabold text-[#0F1C2E] md:text-3xl lg:text-[30px]">Every run. Logged. Traceable.</h2>
             <p className="mb-6 text-[15px] text-slate-500">All past reconciliations in one place — with Request IDs to reference if you receive a GST notice.</p>
           </div>
           <div className="anim-fade-up overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -377,8 +377,8 @@ export default function HomePage() {
               <span className="text-[13px] font-bold text-[#0F1C2E]">Recent Reconciliations</span>
               <span className="text-[11px] text-slate-400">Showing 5 of 24 sessions</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[12px]">
+            <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[800px] border-collapse text-[12px]">
                 <thead>
                   <tr>{["Request ID","Client","Period","Invoices","ITC at Risk","Critical","Status","Date"].map((h)=><th key={h} className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[.6px] text-slate-400">{h}</th>)}</tr>
                 </thead>
@@ -408,15 +408,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="dashboard" className="bg-slate-50 px-12 py-20">
-        <div className="mx-auto max-w-6xl">
+      <section id="dashboard" className="overflow-x-hidden bg-slate-50 py-12 md:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="anim-fade-up">
             <p className="mb-2 text-[12px] font-bold uppercase tracking-[2px] text-[#1447E6]">CA DASHBOARD</p>
-            <h2 className="font-sora mb-2 text-[30px] font-extrabold text-[#0F1C2E]">Your GST compliance command centre.</h2>
+            <h2 className="font-sora mb-2 text-2xl font-extrabold text-[#0F1C2E] md:text-3xl lg:text-[30px]">Your GST compliance command centre.</h2>
             <p className="mb-5 text-[15px] text-slate-500">KPIs, trends, and ITC risk across all your clients — at a glance.</p>
           </div>
 
-          <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               ["Reconciliations","24","This month","text-[#0F1C2E]"],
               ["Total ITC at Risk","₹4.6L","Across all clients","text-red-600"],
@@ -425,15 +425,15 @@ export default function HomePage() {
             ].map((k, i) => (
               <div key={k[0]} className={`anim-scale-in stagger-${i + 1} rounded-xl border border-slate-200 bg-white p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_4px_16px_rgba(15,28,46,.08)]`}>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[.5px] text-slate-400">{k[0]}</p>
-                <p className={`font-sora text-[28px] font-extrabold ${k[3]}`}>{k[1]}</p>
+                <p className={`font-sora text-xl font-extrabold sm:text-2xl lg:text-[28px] ${k[3]}`}>{k[1]}</p>
                 <p className="mt-1 text-[11px] text-slate-400">{k[2]}</p>
               </div>
             ))}
           </div>
 
           <div className="anim-fade-up overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[12px]">
+            <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[800px] border-collapse text-[12px]">
                 <thead>
                   <tr>{["Client","Last Recon","Period","Matched","ITC at Risk","Critical","Action Required"].map((h)=><th key={h} className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[.6px] text-slate-400">{h}</th>)}</tr>
                 </thead>
@@ -461,14 +461,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="gstr3b" className="bg-white px-12 py-20">
-        <div className="mx-auto max-w-6xl">
+      <section id="gstr3b" className="overflow-x-hidden bg-white py-12 md:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="anim-fade-up">
             <p className="mb-2 text-[12px] font-bold uppercase tracking-[2px] text-[#1447E6]">GSTR-3B OUTPUT</p>
-            <h2 className="font-sora mb-2 text-[30px] font-extrabold text-[#0F1C2E]">Filing-ready ITC summary. Automatically.</h2>
+            <h2 className="font-sora mb-2 text-2xl font-extrabold text-[#0F1C2E] md:text-3xl lg:text-[30px]">Filing-ready ITC summary. Automatically.</h2>
             <p className="mb-6 text-[15px] text-slate-500">GST Shield maps reconciled results to GSTR-3B Table 4 — ITC numbers ready before you open the portal.</p>
           </div>
-          <div className="anim-scale-in max-w-[480px] rounded-[14px] bg-[#0F1C2E] p-7">
+          <div className="anim-scale-in w-full max-w-[480px] rounded-[14px] bg-[#0F1C2E] p-5 sm:p-7">
             <div className="mb-5 flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-[.8px] text-slate-400">GSTR-3B · Table 4 Summary</span>
               <span className="rounded bg-blue-700 px-2.5 py-0.5 text-[10px] font-bold text-white">AUTO-GENERATED</span>

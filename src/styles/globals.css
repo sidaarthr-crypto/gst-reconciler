@@ -141,11 +141,11 @@
   }
   html {
     font-size: 16px;
-    @apply font-sans overflow-x-clip;
+    @apply max-w-[100vw] font-sans overflow-x-hidden;
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-background text-foreground overflow-x-clip;
+    @apply max-w-[100vw] bg-background overflow-x-hidden text-foreground;
     font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
     font-size: 1rem;
     line-height: 1.6;

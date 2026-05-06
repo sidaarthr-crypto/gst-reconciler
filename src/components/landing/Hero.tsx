@@ -139,27 +139,20 @@ export function Hero() {
         }}
       />
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-116px)] max-w-[1200px] items-center px-12">
-        <div className="grid w-full grid-cols-2 items-center gap-20 py-20">
-          <div className="max-w-[520px]">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-116px)] max-w-[1200px] items-center px-4 pb-12 pt-8 sm:px-6 sm:py-14 lg:px-12 lg:py-20">
+        <div className="grid w-full grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16 xl:gap-20">
+          <div className="mx-auto w-full max-w-[520px] lg:mx-0">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[.4px] text-blue-700">
               <span className="h-[7px] w-[7px] rounded-full bg-blue-700" />
               GST Compliance Platform · India
             </div>
 
             <h1
+              className="font-sora mb-4 min-h-[8.5rem] text-3xl font-extrabold leading-tight tracking-tight text-[#0F1C2E] md:min-h-[7rem] md:text-4xl lg:min-h-[6.75rem] lg:text-5xl xl:text-[48px]"
               style={{
-                fontFamily: "Sora, sans-serif",
-                fontSize: "48px",
-                fontWeight: 800,
-                lineHeight: 1.1,
-                letterSpacing: "-1.5px",
-                color: "#0F1C2E",
-                marginBottom: "16px",
                 opacity: headlineVisible ? 1 : 0,
                 transform: headlineVisible ? "translateY(0)" : "translateY(10px)",
                 transition: "opacity 0.5s ease, transform 0.5s ease",
-                minHeight: "110px",
               }}
             >
               {headlines[headlineIndex].line1}
@@ -167,26 +160,18 @@ export function Hero() {
               <em style={{ color: "#1447E6", fontStyle: "normal" }}>{headlines[headlineIndex].line2}</em>
             </h1>
 
-            <p
-              style={{
-                fontSize: "1.0625rem",
-                color: "#64748B",
-                lineHeight: 1.6,
-                maxWidth: "520px",
-                marginBottom: "28px",
-              }}
-            >
+            <p className="mb-6 max-w-[520px] text-sm leading-relaxed text-[#64748B] sm:text-base lg:text-[1.0625rem]">
               Upload your GSTR-2B and Purchase Register. GSTRecon runs 28 reconciliation checks,
               scores every invoice by ITC risk, and tells you exactly what to do — before you file
               GSTR-3B.
             </p>
 
-            <div className="mb-4 flex flex-wrap gap-3">
+            <div className="mb-4 flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
                 disabled={navBusy !== null}
                 onClick={() => goReconcile("primary")}
-                className="rounded-[9px] border-none bg-[#1447E6] px-8 py-4 text-[14px] font-bold text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#0F3DD4] hover:shadow-[0_6px_20px_rgba(20,71,230,.35)]"
+                className="min-h-11 w-full rounded-[9px] border-none bg-[#1447E6] px-6 py-3.5 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-px hover:bg-[#0F3DD4] hover:shadow-[0_6px_20px_rgba(20,71,230,.35)] sm:w-auto sm:px-8 sm:py-4 sm:text-[14px]"
               >
                 {navBusy === "primary" ? (
                   <>
@@ -206,7 +191,7 @@ export function Hero() {
                 type="button"
                 disabled={navBusy !== null}
                 onClick={() => goReconcile("secondary")}
-                className="rounded-[9px] border-[1.5px] border-slate-300 bg-white px-8 py-4 text-[14px] font-semibold text-[#0F1C2E] transition-all duration-200 hover:border-slate-500 hover:bg-slate-50"
+                className="min-h-11 w-full rounded-[9px] border-[1.5px] border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-[#0F1C2E] transition-all duration-200 hover:border-slate-500 hover:bg-slate-50 sm:w-auto sm:px-8 sm:py-4 sm:text-[14px]"
               >
                 {navBusy === "secondary" ? (
                   <>
@@ -230,7 +215,7 @@ export function Hero() {
             </div>
           </div>
 
-          <div className="flex w-full flex-col justify-center gap-4">
+          <div className="hidden w-full flex-col justify-center gap-4 lg:flex">
             <div className="mb-1 flex items-center gap-2">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
               <span className="text-[12px] font-bold uppercase tracking-[1.5px] text-slate-400">
@@ -352,15 +337,15 @@ export function Hero() {
               </div>
             </div>
 
-            <div className="mt-1 flex items-center gap-3">
-              <div className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F1C2E] px-4 py-2.5">
+            <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F1C2E] px-4 py-2.5">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="9" stroke="#3B82F6" strokeWidth="1.5" />
                   <path d="M12 7V12L15 15" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
                 <span className="text-[13px] font-bold text-white">Under 60 seconds</span>
               </div>
-              <div className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5">
+              <div className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path
                     d="M9 12L11 14L15 10"
