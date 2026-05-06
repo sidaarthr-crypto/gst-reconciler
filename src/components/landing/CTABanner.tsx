@@ -22,7 +22,7 @@ export function CTABanner() {
           Stop leaving ITC on the table.
         </h2>
         <p className="mx-auto mb-7 max-w-[480px] text-sm leading-relaxed text-slate-400 sm:text-[14px]">
-          GST Shield finds mismatches, blocked credits, and recovery opportunities your team is missing
+          GSTRecon finds mismatches, blocked credits, and recovery opportunities your team is missing
           — every single month.
         </p>
         <button

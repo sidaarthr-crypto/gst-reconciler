@@ -230,7 +230,7 @@ export function Hero() {
                   <div className="h-2.5 w-2.5 rounded-full bg-amber-400" />
                   <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">gst-shield · reconcile</span>
+                <span className="font-mono text-[11px] text-slate-400">gstrecon · reconcile</span>
                 <div className="w-16" />
               </div>
 

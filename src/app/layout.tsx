@@ -22,11 +22,22 @@ const mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "GSTRecon — GSTR-2B Reconciliation",
+  title: "GSTRecon — GST Reconciliation for CAs",
   description:
-    "Upload your GSTR-2B and Purchase Register. Get ITC risk scores, mismatch details, and plain English actions instantly.",
+    "Reconcile GSTR-2B with your Purchase Register. 28 diagnostic checks per invoice. Built for CA firms.",
   icons: {
     icon: "/favicon.svg",
+  },
+  openGraph: {
+    title: "GSTRecon — GST Reconciliation for CAs",
+    description:
+      "Reconcile GSTR-2B with your Purchase Register. 28 diagnostic checks per invoice. Built for CA firms.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GSTRecon — GST Reconciliation for CAs",
+    description:
+      "Reconcile GSTR-2B with your Purchase Register. 28 diagnostic checks per invoice. Built for CA firms.",
   },
 }
 

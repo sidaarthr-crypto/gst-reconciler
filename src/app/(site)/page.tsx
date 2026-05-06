@@ -466,7 +466,7 @@ export default function HomePage() {
           <div className="anim-fade-up">
             <p className="mb-2 text-[12px] font-bold uppercase tracking-[2px] text-[#1447E6]">GSTR-3B OUTPUT</p>
             <h2 className="font-sora mb-2 text-2xl font-extrabold text-[#0F1C2E] md:text-3xl lg:text-[30px]">Filing-ready ITC summary. Automatically.</h2>
-            <p className="mb-6 text-[15px] text-slate-500">GST Shield maps reconciled results to GSTR-3B Table 4 — ITC numbers ready before you open the portal.</p>
+            <p className="mb-6 text-[15px] text-slate-500">GSTRecon maps reconciled results to GSTR-3B Table 4 — ITC numbers ready before you open the portal.</p>
           </div>
           <div className="anim-scale-in w-full max-w-[480px] rounded-[14px] bg-[#0F1C2E] p-5 sm:p-7">
             <div className="mb-5 flex items-center justify-between">
