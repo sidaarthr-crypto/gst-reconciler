@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "")
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -38,7 +39,7 @@ export async function middleware(request: NextRequest) {
 
   if (path.startsWith("/dashboard")) {
     if (!user) {
-      const login = new URL("/auth/login", request.url)
+      const login = new URL("/auth/login", siteUrl)
       login.searchParams.set("next", path)
       return NextResponse.redirect(login)
     }
@@ -47,12 +48,12 @@ export async function middleware(request: NextRequest) {
   const authLandingPaths = ["/auth/login", "/auth/register", "/auth/forgot-password"]
   if (authLandingPaths.some((p) => path === p || path.startsWith(`${p}/`))) {
     if (user) {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
+      return NextResponse.redirect(new URL("/dashboard", siteUrl))
     }
   }
 
   if (path === "/" && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+    return NextResponse.redirect(new URL("/dashboard", siteUrl))
   }
 
   return supabaseResponse

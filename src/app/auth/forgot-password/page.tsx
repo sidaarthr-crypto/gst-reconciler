@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { cn } from "@/lib/utils"
 
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "")
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -32,9 +34,8 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     try {
       const supabase = getSupabaseBrowserClient()
-      const origin = window.location.origin
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${origin}/auth/reset-password`,
+        redirectTo: `${siteUrl}/auth/reset-password`,
       })
       if (err) {
         setError(err.message)
@@ -54,9 +55,8 @@ export default function ForgotPasswordPage() {
     setResendMsg(null)
     try {
       const supabase = getSupabaseBrowserClient()
-      const origin = window.location.origin
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${origin}/auth/reset-password`,
+        redirectTo: `${siteUrl}/auth/reset-password`,
       })
       if (err) {
         setResendMsg(err.message)

@@ -14,6 +14,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { cn } from "@/lib/utils"
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "GSTRecon"
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "")
 
 const spinSolid = (
   <span
@@ -88,13 +89,12 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const supabase = getSupabaseBrowserClient()
-      const origin = window.location.origin
       const { error: err } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { full_name: fullName.trim() },
-          emailRedirectTo: `${origin}/auth/callback`,
+          emailRedirectTo: `${siteUrl}/auth/callback`,
         },
       })
       if (err) {
@@ -114,10 +114,9 @@ export default function RegisterPage() {
     setGoogleLoading(true)
     try {
       const supabase = getSupabaseBrowserClient()
-      const origin = window.location.origin
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${origin}/auth/callback` },
+        options: { redirectTo: `${siteUrl}/auth/callback` },
       })
       if (err) {
         setError(err.message)
@@ -138,7 +137,7 @@ export default function RegisterPage() {
       const { error: err } = await supabase.auth.resend({
         type: "signup",
         email,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${siteUrl}/auth/callback` },
       })
       if (err) {
         setResendMsg(err.message)

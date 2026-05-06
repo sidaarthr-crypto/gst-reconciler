@@ -15,6 +15,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { cn } from "@/lib/utils"
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME ?? "GSTRecon"
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "")
 
 const spinSolid = (
   <span
@@ -67,10 +68,9 @@ export default function LoginPage() {
     setGoogleLoading(true)
     try {
       const supabase = getSupabaseBrowserClient()
-      const origin = window.location.origin
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${origin}/auth/callback` },
+        options: { redirectTo: `${siteUrl}/auth/callback` },
       })
       if (err) {
         setError(err.message)
