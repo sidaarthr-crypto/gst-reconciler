@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google"
 import { ThemeProvider } from "next-themes"
 
 import { UmamiAnalytics } from "@/components/UmamiAnalytics"
+import { FeedbackButton } from "@/components/layout/FeedbackButton"
 import { AuthProvider } from "@/hooks/useAuth"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -67,6 +68,7 @@ export default function RootLayout({
           </TooltipProvider>
         </ThemeProvider>
         <UmamiAnalytics />
+        <FeedbackButton />
       </body>
     </html>
   )
