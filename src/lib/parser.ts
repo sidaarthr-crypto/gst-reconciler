@@ -6,6 +6,21 @@ import {
   type Gstr2bSheetHints,
 } from "@/lib/file-validation"
 import { findHeaderForAliases } from "@/lib/header-match"
+import {
+  PR_CESS_ALIASES,
+  PR_CGST_ALIASES,
+  PR_IGST_ALIASES,
+  PR_INVOICE_DATE_ALIASES,
+  PR_INVOICE_NUMBER_ALIASES,
+  PR_ITC_AVAILABLE_ALIASES,
+  PR_PLACE_OF_SUPPLY_ALIASES,
+  PR_REVERSE_CHARGE_ALIASES,
+  PR_SGST_ALIASES,
+  PR_SUPPLIER_GSTIN_ALIASES,
+  PR_SUPPLIER_NAME_ALIASES,
+  PR_TAXABLE_VALUE_ALIASES,
+  PR_TOTAL_INVOICE_VALUE_ALIASES,
+} from "@/lib/pr-column-aliases"
 import type { GSTR2BRow, ITCStatus, ParseResult, PurchaseRegisterRow } from "@/lib/types"
 import { getMonthName, normaliseGSTIN, parseInvoiceDateFlexible } from "@/lib/utils"
 
@@ -85,22 +100,56 @@ function readMatrixFromWorkbook(
   return matrix
 }
 
+function detectPurchaseRegisterHeaderRowIndex(matrix: unknown[][]): number {
+  const gstinAliases = [...PR_SUPPLIER_GSTIN_ALIASES]
+  const invAliases = [...PR_INVOICE_NUMBER_ALIASES]
+  const txAliases = [...PR_TAXABLE_VALUE_ALIASES]
+  const maxScan = Math.min(matrix.length, 21)
+  let bestR = -1
+  let bestScore = -1
+
+  for (let r = 0; r < maxScan; r++) {
+    const row = matrix[r] as unknown[]
+    if (!Array.isArray(row) || row.every((c) => String(c ?? "").trim() === "")) {
+      continue
+    }
+    const headers = rowToHeaderStrings(row)
+    const hasG = Boolean(findHeaderForAliases(headers, gstinAliases))
+    const hasI = Boolean(findHeaderForAliases(headers, invAliases))
+    const hasT = Boolean(findHeaderForAliases(headers, txAliases))
+    const score = (hasG ? 1 : 0) + (hasI ? 1 : 0) + (hasT ? 1 : 0)
+    const qualifies =
+      score >= 3 || (hasG && hasI) || (hasG && hasT)
+    if (!qualifies) continue
+
+    if (
+      bestR === -1 ||
+      score > bestScore ||
+      (score === bestScore && r < bestR)
+    ) {
+      bestScore = score
+      bestR = r
+    }
+  }
+
+  return bestR
+}
+
 function detectHeaderRowIndex(
   matrix: unknown[][],
   mode: "gstr2b" | "pr",
 ): number {
-  const required =
-    mode === "gstr2b"
-      ? [
-          GSTR2B_ALIASES.supplierGSTIN,
-          GSTR2B_ALIASES.invoiceNumber,
-          GSTR2B_ALIASES.taxableValue,
-        ]
-      : [
-          PR_ALIASES.supplierGSTIN,
-          PR_ALIASES.invoiceNumber,
-          PR_ALIASES.taxableValue,
-        ]
+  if (mode === "pr") {
+    // Two-row merged PR headers are resolved in readSheetRowsWithMeta via
+    // detectPurchaseRegisterStrictHeaderMatrix + matrixToObjectsFromHeaders.
+    return detectPurchaseRegisterHeaderRowIndex(matrix)
+  }
+
+  const required = [
+    GSTR2B_ALIASES.supplierGSTIN,
+    GSTR2B_ALIASES.invoiceNumber,
+    GSTR2B_ALIASES.taxableValue,
+  ]
 
   const maxScan = Math.min(matrix.length, 60)
   for (let r = 0; r < maxScan; r++) {
@@ -112,8 +161,195 @@ function detectHeaderRowIndex(
     if (tryResolveColumns(headers, required)) {
       return r
     }
+    if (r + 1 < matrix.length) {
+      const row2 = matrix[r + 1] as unknown[]
+      if (!Array.isArray(row2) || row2.every((c) => String(c ?? "").trim() === "")) {
+        continue
+      }
+      const merged = combineTwoHeaderRows(row, row2)
+      if (tryResolveColumns(merged, required)) {
+        return r
+      }
+    }
   }
   return -1
+}
+
+/**
+ * GST portal 2-row header: prefer top cell when non-empty (gap-fill from bottom).
+ * When both rows have text in the same column and top is a merged group title
+ * ("Invoice Details", "Tax Amount"), use the sub-header row text so aliases match.
+ */
+function combineTwoHeaderRows(top: unknown[], bottom: unknown[]): string[] {
+  const len = Math.max(top.length, bottom.length)
+  const out: string[] = []
+  const isGroupBanner = (s: string) => {
+    const u = s.toLowerCase()
+    return u === "invoice details" || u === "tax amount" || /^tax amount\b/i.test(s.trim())
+  }
+  for (let i = 0; i < len; i++) {
+    const t = String(top[i] ?? "").trim()
+    const b = String(bottom[i] ?? "").trim()
+    if (!t) {
+      out.push(b)
+      continue
+    }
+    if (!b) {
+      out.push(t)
+      continue
+    }
+    if (isGroupBanner(t)) out.push(b)
+    else out.push(t)
+  }
+  return out
+}
+
+type Gstr2bHeaderDetection = {
+  dataStartRow: number
+  headers: string[]
+}
+
+/**
+ * Rows 0–20: find a single header row, or a group row + sub-header row (GST portal export).
+ */
+function detectGstr2bHeaderMatrix(matrix: unknown[][]): Gstr2bHeaderDetection | null {
+  const required = [
+    GSTR2B_ALIASES.supplierGSTIN,
+    GSTR2B_ALIASES.invoiceNumber,
+    GSTR2B_ALIASES.taxableValue,
+  ]
+
+  const maxScan = Math.min(matrix.length, 21)
+  for (let r = 0; r < maxScan; r++) {
+    const row = matrix[r] as unknown[]
+    if (!Array.isArray(row) || row.every((c) => String(c ?? "").trim() === "")) {
+      continue
+    }
+    const headersSingle = rowToHeaderStrings(row)
+    if (tryResolveColumns(headersSingle, required)) {
+      return { dataStartRow: r + 1, headers: headersSingle }
+    }
+    if (r + 1 < matrix.length) {
+      const row2 = matrix[r + 1] as unknown[]
+      if (!Array.isArray(row2) || row2.every((c) => String(c ?? "").trim() === "")) {
+        continue
+      }
+      const combined = combineTwoHeaderRows(row, row2)
+      if (tryResolveColumns(combined, required)) {
+        return { dataStartRow: r + 2, headers: combined }
+      }
+    }
+  }
+  return null
+}
+
+/** Single-row or two-row merged header (GST portal / third-party GSTR-style PR exports). */
+function detectPurchaseRegisterStrictHeaderMatrix(
+  matrix: unknown[][],
+): Gstr2bHeaderDetection | null {
+  const required = [
+    {
+      aliases: [...PR_SUPPLIER_GSTIN_ALIASES],
+      label: "Supplier GSTIN",
+      examples: "GSTIN, gstin of supplier",
+    },
+    {
+      aliases: [...PR_INVOICE_NUMBER_ALIASES],
+      label: "Invoice Number",
+      examples: "invoice number, invoice no",
+    },
+    {
+      aliases: [...PR_TAXABLE_VALUE_ALIASES],
+      label: "Taxable Value",
+      examples: "taxable value, taxable amount",
+    },
+  ]
+
+  const maxScan = Math.min(matrix.length, 21)
+  for (let r = 0; r < maxScan; r++) {
+    const row = matrix[r] as unknown[]
+    if (!Array.isArray(row) || row.every((c) => String(c ?? "").trim() === "")) {
+      continue
+    }
+    const headersSingle = rowToHeaderStrings(row)
+    if (tryResolveColumns(headersSingle, required)) {
+      return { dataStartRow: r + 1, headers: headersSingle }
+    }
+    if (r + 1 < matrix.length) {
+      const row2 = matrix[r + 1] as unknown[]
+      if (!Array.isArray(row2) || row2.every((c) => String(c ?? "").trim() === "")) {
+        continue
+      }
+      const combined = combineTwoHeaderRows(row, row2)
+      if (tryResolveColumns(combined, required)) {
+        return { dataStartRow: r + 2, headers: combined }
+      }
+    }
+  }
+  return null
+}
+
+function matrixToObjectsFromHeaders(
+  matrix: unknown[][],
+  dataStartRow: number,
+  headers: string[],
+): Record<string, unknown>[] {
+  const objects: Record<string, unknown>[] = []
+  for (let r = dataStartRow; r < matrix.length; r++) {
+    const row = matrix[r] as unknown[]
+    if (!row || row.every((c) => String(c ?? "").trim() === "")) continue
+    const obj: Record<string, unknown> = {}
+    headers.forEach((h, idx) => {
+      if (!h) return
+      obj[h] = row[idx] ?? ""
+    })
+    objects.push(obj)
+  }
+  return objects
+}
+
+/** Prefer B2B sheet, then other sheets that may contain the same columns (e.g. ITC Available). */
+function orderedGstr2bSheetCandidates(
+  sheetNames: string[],
+  preferredB2bName: string | null,
+): string[] {
+  const all = sheetNames.filter((n) => n != null && String(n).trim() !== "")
+  const upper = all.map((n) => n.trim().toUpperCase())
+  const seen = new Set<string>()
+  const out: string[] = []
+  const push = (name: string) => {
+    if (!seen.has(name)) {
+      seen.add(name)
+      out.push(name)
+    }
+  }
+  if (preferredB2bName) push(preferredB2bName)
+  const exactB2b = all.find((_, i) => upper[i] === "B2B")
+  if (exactB2b) push(exactB2b)
+  for (let i = 0; i < all.length; i++) {
+    if (upper[i].includes("B2B")) push(all[i]!)
+  }
+  for (const name of all) push(name)
+  return out
+}
+
+function findGstr2bMatrixAndHeaders(
+  workbook: XLSX.WorkBook,
+  preferredB2bName: string | null,
+): { matrix: unknown[][]; sheetUsed: string; detection: Gstr2bHeaderDetection } | null {
+  for (const sheetName of orderedGstr2bSheetCandidates(workbook.SheetNames, preferredB2bName)) {
+    const sheet = workbook.Sheets[sheetName]
+    if (!sheet) continue
+    const matrix = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: "",
+      raw: false,
+    }) as unknown[][]
+    if (!matrix.length) continue
+    const detection = detectGstr2bHeaderMatrix(matrix)
+    if (detection) return { matrix, sheetUsed: sheetName, detection }
+  }
+  return null
 }
 
 function matrixToObjects(matrix: unknown[][], headerRowIdx: number): Record<string, unknown>[] {
@@ -131,6 +367,20 @@ function matrixToObjects(matrix: unknown[][], headerRowIdx: number): Record<stri
     objects.push(obj)
   }
   return objects
+}
+
+function rowsFromMatrixPurchaseRegister(matrix: unknown[][]): Record<string, unknown>[] {
+  const strict = detectPurchaseRegisterStrictHeaderMatrix(matrix)
+  if (strict) {
+    return matrixToObjectsFromHeaders(matrix, strict.dataStartRow, strict.headers)
+  }
+  const headerRowIdx = detectPurchaseRegisterHeaderRowIndex(matrix)
+  if (headerRowIdx === -1) {
+    throw new ParseError(
+      "Could not find a header row with the required columns. Make sure the file includes a row with Supplier GSTIN and Invoice Number headers.",
+    )
+  }
+  return matrixToObjects(matrix, headerRowIdx)
 }
 
 function readSheetRowsWithMeta(
@@ -162,14 +412,20 @@ function readSheetRowsWithMeta(
     if (!matrix.length) {
       throw new ParseError("File is empty — no data rows found")
     }
-    const headerRowIdx = detectHeaderRowIndex(matrix, mode)
-    if (headerRowIdx === -1) {
-      throw new ParseError(
-        "Could not find a header row with the required columns. Make sure the file includes a row with Supplier GSTIN and Invoice Number headers.",
-      )
-    }
+    const rows =
+      mode === "pr"
+        ? rowsFromMatrixPurchaseRegister(matrix)
+        : (() => {
+            const headerRowIdx = detectHeaderRowIndex(matrix, mode)
+            if (headerRowIdx === -1) {
+              throw new ParseError(
+                "Could not find a header row with the required columns. Make sure the file includes a row with Supplier GSTIN and Invoice Number headers.",
+              )
+            }
+            return matrixToObjects(matrix, headerRowIdx)
+          })()
     return {
-      rows: matrixToObjects(matrix, headerRowIdx),
+      rows,
       sheetNames,
       fileIsXlsx: false,
     }
@@ -179,14 +435,20 @@ function readSheetRowsWithMeta(
   if (!matrix.length) {
     throw new ParseError("File is empty — no data rows found")
   }
-  const headerRowIdx = detectHeaderRowIndex(matrix, mode)
-  if (headerRowIdx === -1) {
-    throw new ParseError(
-      "Could not find a header row with the required columns. For GSTR-2B, ensure a row contains GSTIN / CTIN and invoice columns (multi-line headers like “GSTIN of Supplier (ctin)” are supported).",
-    )
-  }
+  const rows =
+    mode === "pr"
+      ? rowsFromMatrixPurchaseRegister(matrix)
+      : (() => {
+          const headerRowIdx = detectHeaderRowIndex(matrix, mode)
+          if (headerRowIdx === -1) {
+            throw new ParseError(
+              "Could not find a header row with the required columns. For GSTR-2B, ensure a row contains GSTIN / CTIN and invoice columns (multi-line headers like “GSTIN of Supplier (ctin)” are supported).",
+            )
+          }
+          return matrixToObjects(matrix, headerRowIdx)
+        })()
   return {
-    rows: matrixToObjects(matrix, headerRowIdx),
+    rows,
     sheetNames,
     fileIsXlsx: true,
   }
@@ -201,6 +463,59 @@ export function parseNumber(val: unknown): number {
     .trim()
   const n = parseFloat(s)
   return Number.isFinite(n) ? n : 0
+}
+
+/** Rows in the raw matrix from dataStartRow onward that contain any non-empty cell. */
+function countNonEmptyDataRowsInMatrix(matrix: unknown[][], dataStartRow: number): number {
+  let n = 0
+  for (let r = dataStartRow; r < matrix.length; r++) {
+    const row = matrix[r] as unknown[]
+    if (!row) continue
+    if (row.some((c) => String(c ?? "").trim() !== "")) n++
+  }
+  return n
+}
+
+/** When PR has no standard IGST/CGST/SGST/Cess column, sum ledger-style Tally columns by header text. */
+function sumPrLedgerTaxColumns(
+  row: Record<string, unknown>,
+  headers: string[],
+  kind: "igst" | "cgst" | "sgst" | "cess",
+): number {
+  let sum = 0
+  for (const h of headers) {
+    const hl = h.toLowerCase()
+    if (kind === "igst") {
+      if (!hl.includes("igst")) continue
+      if (hl.includes("cgst") || hl.includes("sgst")) continue
+    } else if (kind === "cgst") {
+      if (!hl.includes("cgst")) continue
+    } else if (kind === "sgst") {
+      if (!hl.includes("sgst")) continue
+    } else if (!/\bcess\b/i.test(h) && !hl.includes("compensation cess")) {
+      continue
+    }
+    sum += parseNumber(row[h])
+  }
+  return sum
+}
+
+/**
+ * Count data rows that have at least one value in mapped identity columns (GSTIN, invoice no., date).
+ * Excludes rows like "Grand Total" that only have tax/amount columns filled.
+ */
+function countPurchaseRegisterIdentityRows(
+  rawRows: Record<string, unknown>[],
+  identityHeaderKeys: string[],
+): number {
+  if (identityHeaderKeys.length === 0) return 0
+  return rawRows.filter((row) =>
+    identityHeaderKeys.some((h) => {
+      const v = row[h]
+      if (v === "" || v == null) return false
+      return String(v).trim() !== ""
+    }),
+  ).length
 }
 
 export function parseITCStatus(val: unknown): ITCStatus {
@@ -330,6 +645,8 @@ const GSTR2B_ALIASES = {
     aliases: [
       "trdnm",
       "trade name",
+      "trade/legal name",
+      "trade legal name",
       "supplier name",
       "legal name",
       "party name",
@@ -387,7 +704,13 @@ const GSTR2B_ALIASES = {
     required: false,
   },
   reverseCharge: {
-    aliases: ["rev", "reverse charge", "rcm", "rch"],
+    aliases: [
+      "rev",
+      "reverse charge",
+      "supply attract reverse charge",
+      "rcm",
+      "rch",
+    ],
     label: "Reverse Charge",
     examples: "rev, reverse charge",
     required: false,
@@ -398,6 +721,7 @@ const GSTR2B_ALIASES = {
       "itc avl",
       "itc available",
       "itc availability",
+      "itc availibility",
       "input tax credit",
     ],
     label: "ITC Available",
@@ -414,6 +738,8 @@ const GSTR2B_ALIASES = {
     aliases: [
       "txval",
       "taxable value",
+      "taxable value (₹)",
+      "taxable value rs",
       "taxable amount",
       "taxable",
       "assessable value",
@@ -428,6 +754,9 @@ const GSTR2B_ALIASES = {
       "igst amount",
       "integrated gst",
       "integrated tax",
+      "integrated tax(₹)",
+      "integrated tax rs",
+      "igst rs",
       "igst paid",
     ],
     label: "IGST",
@@ -435,7 +764,16 @@ const GSTR2B_ALIASES = {
     required: false,
   },
   cgst: {
-    aliases: ["cgst", "cgst amount", "central gst", "central tax", "cgst paid"],
+    aliases: [
+      "cgst",
+      "cgst amount",
+      "central gst",
+      "central tax",
+      "central tax(₹)",
+      "central tax rs",
+      "cgst rs",
+      "cgst paid",
+    ],
     label: "CGST",
     examples: "cgst, central tax",
     required: false,
@@ -446,6 +784,11 @@ const GSTR2B_ALIASES = {
       "sgst amount",
       "state gst",
       "state tax",
+      "state ut tax",
+      "state ut tax rs",
+      "state/ut tax",
+      "state/ut tax(₹)",
+      "sgst rs",
       "sgst paid",
       "utgst",
       "utgst amount",
@@ -455,7 +798,7 @@ const GSTR2B_ALIASES = {
     required: false,
   },
   cess: {
-    aliases: ["cess", "cess amount", "cess paid"],
+    aliases: ["cess", "cess amount", "cess(₹)", "cess rs", "cess paid"],
     label: "Cess",
     examples: "cess",
     required: false,
@@ -473,7 +816,14 @@ const GSTR2B_ALIASES = {
     required: false,
   },
   supplierFilingDate: {
-    aliases: ["supfildt", "supplier filing date", "filing date"],
+    aliases: [
+      "supfildt",
+      "supplier filing date",
+      "filing date",
+      "gstr-1/1a/iff/gstr-5 filing date",
+      "gstr-1/5 filling date",
+      "gstr-1/5 filing date",
+    ],
     label: "Supplier Filing Date",
     examples: "supfildt",
     required: false,
@@ -494,6 +844,11 @@ const GSTR2B_ALIASES = {
       "return period of supplier",
       "filing return period",
       "sup filing period",
+      "gstr-1/1a/iff/gstr-5 period",
+      "gstr-1/5 filling period",
+      "gstr-1/5 filing period",
+      "gstr 1 1a iff gstr 5 period",
+      "gstr 1 5 filling period",
       /* Do not add supfildt here — that maps supplier filing *date*, not period (MMYYYY). */
     ],
     label: "Supplier Return Period",
@@ -504,109 +859,76 @@ const GSTR2B_ALIASES = {
 
 const PR_ALIASES = {
   supplierGSTIN: {
-    aliases: [
-      "gstin",
-      "supplier gstin",
-      "gst no",
-      "supplier gst no",
-      "party gstin",
-      "vendor gstin",
-      "gstin of supplier",
-    ],
+    aliases: [...PR_SUPPLIER_GSTIN_ALIASES],
     label: "Supplier GSTIN",
     examples: "GSTIN, ctin, Supplier GSTIN",
   },
   supplierName: {
-    aliases: [
-      "supplier name",
-      "party name",
-      "vendor name",
-      "creditor name",
-      "supplier",
-      "party",
-      "name",
-    ],
+    aliases: [...PR_SUPPLIER_NAME_ALIASES],
     label: "Supplier Name",
     examples: "supplier name, party name",
     required: false,
   },
   invoiceNumber: {
-    aliases: [
-      "invoice no",
-      "bill no",
-      "invoice number",
-      "bill number",
-      "voucher no",
-      "ref no",
-      "doc no",
-    ],
+    aliases: [...PR_INVOICE_NUMBER_ALIASES],
     label: "Invoice Number",
     examples: "invoice no, bill no, invoice number",
   },
   invoiceDate: {
-    aliases: ["invoice date", "bill date", "date", "voucher date", "doc date"],
+    aliases: [...PR_INVOICE_DATE_ALIASES],
     label: "Invoice Date",
     examples: "invoice date, bill date",
     required: false,
   },
   taxableValue: {
-    aliases: [
-      "taxable value",
-      "taxable amount",
-      "taxable",
-      "assessable value",
-      "net amount",
-      "basic amount",
-    ],
+    aliases: [...PR_TAXABLE_VALUE_ALIASES],
     label: "Taxable Value",
     examples: "taxable value, taxable amount, taxable",
   },
   igst: {
-    aliases: ["igst", "igst amount", "integrated tax", "integrated gst"],
+    aliases: [...PR_IGST_ALIASES],
     label: "IGST",
     examples: "igst, integrated tax",
     required: false,
   },
   cgst: {
-    aliases: ["cgst", "cgst amount", "central tax", "central gst"],
+    aliases: [...PR_CGST_ALIASES],
     label: "CGST",
     examples: "cgst, central tax",
     required: false,
   },
   sgst: {
-    aliases: [
-      "sgst",
-      "sgst amount",
-      "state tax",
-      "state gst",
-      "utgst",
-      "utgst amount",
-    ],
+    aliases: [...PR_SGST_ALIASES],
     label: "SGST",
     examples: "sgst, state gst",
     required: false,
   },
   cess: {
-    aliases: ["cess", "cess amount"],
+    aliases: [...PR_CESS_ALIASES],
     label: "Cess",
     examples: "cess",
     required: false,
   },
+  itcAvailable: {
+    aliases: [...PR_ITC_AVAILABLE_ALIASES],
+    label: "ITC Available",
+    examples: "itc availability, itcavl",
+    required: false,
+  },
+  reverseCharge: {
+    aliases: [...PR_REVERSE_CHARGE_ALIASES],
+    label: "Reverse Charge",
+    examples: "reverse charge, supply attract reverse charge",
+    required: false,
+  },
   totalInvoiceValue: {
-    aliases: [
-      "invoice value",
-      "total amount",
-      "invoice amount",
-      "total",
-      "gross amount",
-      "net payable",
-    ],
+    aliases: [...PR_TOTAL_INVOICE_VALUE_ALIASES],
     label: "Total Invoice Value",
     examples: "invoice value, total amount",
     required: false,
   },
   placeOfSupply: {
-    aliases: ["place of supply", "pos", "supply state"],
+    aliases: [...PR_PLACE_OF_SUPPLY_ALIASES],
     label: "Place of Supply",
     examples: "place of supply, pos",
     required: false,
@@ -762,6 +1084,8 @@ export async function parseGSTR2BFile(
   let fileIsXlsx: boolean
   let foundSheets: string[] = [...workbook.SheetNames]
   let sheetHints: Gstr2bSheetHints
+  let gstr2bMatrix: unknown[][] | null = null
+  let gstr2bDataStartRow = 0
 
   if (lower.endsWith(".csv")) {
     fileIsXlsx = false
@@ -774,19 +1098,21 @@ export async function parseGSTR2BFile(
     if (!matrix.length) {
       throw new ParseError("File is empty — no data rows found")
     }
+    gstr2bMatrix = matrix
     if (matrix.length >= 2) {
       const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(matrix, 1))
       recipientGSTIN = ex.recipientGSTIN
       recipientName = ex.recipientName
       returnPeriod = ex.returnPeriod
     }
-    const headerRowIdx = detectHeaderRowIndex(matrix, "gstr2b")
-    if (headerRowIdx === -1) {
+    const det = detectGstr2bHeaderMatrix(matrix)
+    if (!det) {
       throw new ParseError(
         "Could not find a header row with the required columns. Make sure the file includes a row with Supplier GSTIN and Invoice Number headers.",
       )
     }
-    rawAll = matrixToObjects(matrix, headerRowIdx)
+    gstr2bDataStartRow = det.dataStartRow
+    rawAll = matrixToObjectsFromHeaders(matrix, det.dataStartRow, det.headers)
     sheetHints = {
       hasB2BSheet: true,
       supportingCount: 0,
@@ -798,7 +1124,9 @@ export async function parseGSTR2BFile(
     const analysis = analyzeGstr2bXlsxSheets(workbook)
     foundSheets = analysis.foundSheets
     sheetHints = analysis.sheetHints
-    if (!analysis.b2bSheetName) {
+
+    const located = findGstr2bMatrixAndHeaders(workbook, analysis.b2bSheetName)
+    if (!located) {
       const validation = validateGSTR2BFile(
         [],
         [],
@@ -823,33 +1151,24 @@ export async function parseGSTR2BFile(
         ...recipientFields(),
       }
     }
-    const b2bSheet = workbook.Sheets[analysis.b2bSheetName]
-    if (!b2bSheet) {
-      throw new ParseError(
-        "This file appears to be empty. Make sure you exported data rows from the portal.",
-      )
+
+    const { matrix, detection } = located
+    gstr2bMatrix = matrix
+    gstr2bDataStartRow = detection.dataStartRow
+    if (!sheetHints.hasB2BSheet) {
+      sheetHints = {
+        ...sheetHints,
+        hasB2BSheet: true,
+      }
     }
-    const matrix = XLSX.utils.sheet_to_json(b2bSheet, {
-      header: 1,
-      defval: "",
-      raw: false,
-    }) as unknown[][]
-    if (!matrix.length) {
-      throw new ParseError("File is empty — no data rows found")
-    }
+
     if (matrix.length >= 2) {
       const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(matrix, 1))
       recipientGSTIN = ex.recipientGSTIN
       recipientName = ex.recipientName
       returnPeriod = ex.returnPeriod
     }
-    const headerRowIdx = detectHeaderRowIndex(matrix, "gstr2b")
-    if (headerRowIdx === -1) {
-      throw new ParseError(
-        "Could not find a header row with the required columns. For GSTR-2B, ensure a row contains GSTIN / CTIN and invoice columns (multi-line headers like “GSTIN of Supplier (ctin)” are supported).",
-      )
-    }
-    rawAll = matrixToObjects(matrix, headerRowIdx)
+    rawAll = matrixToObjectsFromHeaders(matrix, detection.dataStartRow, detection.headers)
   }
 
   if (!rawAll.length) {
@@ -1099,6 +1418,12 @@ export async function parseGSTR2BFile(
   }
 
   if (!rows.length) {
+    const nonEmptyBelow = gstr2bMatrix
+      ? countNonEmptyDataRowsInMatrix(gstr2bMatrix, gstr2bDataStartRow)
+      : 0
+    if (nonEmptyBelow === 0) {
+      throw new ParseError("File is empty — no data rows found")
+    }
     const validation = validateGSTR2BFile(
       rawRows,
       headers,
@@ -1156,6 +1481,7 @@ export async function parsePurchaseRegisterFile(
   const buffer = await file.arrayBuffer()
   const errors: string[] = []
   const { rows: rawRows } = readSheetRowsWithMeta(file, buffer, "pr")
+  // Same as case (a) below: nothing but blanks below the header → no row objects.
   if (!rawRows.length) {
     throw new ParseError("File is empty — no data rows found")
   }
@@ -1265,6 +1591,16 @@ export async function parsePurchaseRegisterFile(
     ),
   }
 
+  const identityColumnHeaders = [
+    col.supplierGSTIN,
+    col.invoiceNumber,
+    col.invoiceDate,
+  ].filter((h): h is string => Boolean(h))
+  const nonEmptyIdentityDataRowsBelowHeader = countPurchaseRegisterIdentityRows(
+    rawRows,
+    identityColumnHeaders,
+  )
+
   const rows: PurchaseRegisterRow[] = []
   for (const r of rawRows) {
     const supplierGSTIN = String(getCell(r, col.supplierGSTIN) ?? "").trim()
@@ -1287,10 +1623,14 @@ export async function parsePurchaseRegisterFile(
       )
     }
 
-    const igst = parseNumber(getCell(r, col.igst))
-    const cgst = parseNumber(getCell(r, col.cgst))
-    const sgst = parseNumber(getCell(r, col.sgst))
-    const cess = parseNumber(getCell(r, col.cess))
+    let igst = col.igst ? parseNumber(getCell(r, col.igst)) : 0
+    let cgst = col.cgst ? parseNumber(getCell(r, col.cgst)) : 0
+    let sgst = col.sgst ? parseNumber(getCell(r, col.sgst)) : 0
+    let cess = col.cess ? parseNumber(getCell(r, col.cess)) : 0
+    if (!col.igst) igst = sumPrLedgerTaxColumns(r, headers, "igst")
+    if (!col.cgst) cgst = sumPrLedgerTaxColumns(r, headers, "cgst")
+    if (!col.sgst) sgst = sumPrLedgerTaxColumns(r, headers, "sgst")
+    if (!col.cess) cess = sumPrLedgerTaxColumns(r, headers, "cess")
     const totalFromCol = parseNumber(getCell(r, col.totalInvoiceValue))
     const totalInvoiceValue =
       totalFromCol > 0 ? totalFromCol : taxableValue + igst + cgst + sgst + cess
@@ -1322,9 +1662,14 @@ export async function parsePurchaseRegisterFile(
   }
 
   if (!rows.length) {
-    throw new ParseError(
-      "Zero valid rows after parsing — check if file has data rows below the header",
-    )
+    // (b) At least one row has identity fields (Date / GSTIN / Invoice No.) but none passed validation.
+    if (nonEmptyIdentityDataRowsBelowHeader > 0) {
+      throw new ParseError(
+        "No valid invoice rows found — check Supplier GSTIN and invoice number columns contain values",
+      )
+    }
+    // (a) No substantive invoice rows (or only totals / amount-only rows) — template / empty export.
+    throw new ParseError("File is empty — no data rows found")
   }
 
   const validation = validatePurchaseRegister(rawRows, headers)

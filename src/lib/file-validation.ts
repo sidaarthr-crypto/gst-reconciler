@@ -1,5 +1,10 @@
 import { findHeaderForAliases } from "@/lib/header-match"
 import type { FileValidationConfidence, FileValidationResult } from "@/lib/types"
+import {
+  PR_INVOICE_NUMBER_ALIASES,
+  PR_SUPPLIER_GSTIN_ALIASES,
+  PR_TAXABLE_VALUE_ALIASES,
+} from "@/lib/pr-column-aliases"
 import { normaliseGSTIN } from "@/lib/utils"
 
 const GSTIN_REGEX =
@@ -47,6 +52,7 @@ const GSTR2B_SUPPLIER_ALIASES = [
   "ctin",
   "gstin of supplier",
   "supplier gstin",
+  "supplier gst no",
   "gstin",
   "vendor gstin",
   "gstin/uin",
@@ -60,8 +66,10 @@ const GSTR2B_INUM_ALIASES = [
   "invoice number",
   "inv no",
   "bill no",
+  "bill number",
   "document no",
   "ref no",
+  "voucher no",
 ] as const
 
 const GSTR2B_DT_ALIASES = [
@@ -70,6 +78,8 @@ const GSTR2B_DT_ALIASES = [
   "bill date",
   "document date",
   "date",
+  "voucher date",
+  "doc date",
 ] as const
 
 const GSTR2B_ITC_ALIASES = [
@@ -77,12 +87,15 @@ const GSTR2B_ITC_ALIASES = [
   "itc available",
   "itc avail",
   "itc availability",
+  "itc availibility",
   "input tax credit",
 ] as const
 
 const GSTR2B_TXVAL_ALIASES = [
   "txval",
   "taxable value",
+  "taxable value (₹)",
+  "taxable value rs",
   "taxable val",
   "taxable amount",
   "taxable",
@@ -93,43 +106,41 @@ const GSTR2B_TYP_ALIASES = ["typ", "invoice type", "type", "document type"] as c
 const GSTR2B_SUPFILD_ALIASES = [
   "supfildt",
   "supplier filing date",
-  "supplier return period",
+  "filing date",
+  "gstr-1/1a/iff/gstr-5 filing date",
+  "gstr-1/5 filling date",
+  "gstr-1/5 filing date",
 ] as const
 
-const PR_SUPPLIER_ALIASES = [
-  "supplier gstin",
-  "gstin",
-  "vendor gstin",
-  "party gstin",
-  "gstin of supplier",
-  "gstin/uin",
-  "gstinofsupplier",
-  "ctin",
-] as const
+const PR_SUPPLIER_ALIASES = PR_SUPPLIER_GSTIN_ALIASES
+const PR_INVOICE_ALIASES = PR_INVOICE_NUMBER_ALIASES
+const PR_TAXABLE_ALIASES = PR_TAXABLE_VALUE_ALIASES
 
-const PR_INVOICE_ALIASES = [
-  "invoice no",
-  "invoice number",
-  "inv no",
-  "bill no",
-  "voucher no",
-  "document no",
-  "ref no",
-  "inum",
+const AMOUNT_ALIASES_IGST = [
+  "iamt",
+  "igst",
+  "igst amount",
+  "integrated tax",
+  "integrated tax(₹)",
+  "integrated tax rs",
 ] as const
-
-const PR_TAXABLE_ALIASES = [
-  "taxable value",
-  "taxable amount",
-  "taxable",
-  "assessable value",
-  "net value",
-  "txval",
+const AMOUNT_ALIASES_CGST = [
+  "camt",
+  "cgst",
+  "cgst amount",
+  "central tax",
+  "central tax(₹)",
+  "central tax rs",
 ] as const
-
-const AMOUNT_ALIASES_IGST = ["iamt", "igst", "igst amount", "integrated tax"] as const
-const AMOUNT_ALIASES_CGST = ["camt", "cgst", "cgst amount", "central tax"] as const
-const AMOUNT_ALIASES_SGST = ["samt", "sgst", "sgst amount", "state tax"] as const
+const AMOUNT_ALIASES_SGST = [
+  "samt",
+  "sgst",
+  "sgst amount",
+  "state tax",
+  "state ut tax",
+  "state/ut tax",
+  "state/ut tax(₹)",
+] as const
 
 function looksLikeGstr2bByHeaders(headers: string[]): boolean {
   const itc = findHeaderForAliases(headers, GSTR2B_ITC_ALIASES)
@@ -397,9 +408,9 @@ export function validatePurchaseRegister(
     warnings.push("Only 1 invoice found — are you sure this is complete?")
   }
 
-  const gstinKey = findHeaderForAliases(headers, PR_SUPPLIER_ALIASES)
-  const invKey = findHeaderForAliases(headers, PR_INVOICE_ALIASES)
-  const txKey = findHeaderForAliases(headers, PR_TAXABLE_ALIASES)
+  const gstinKey = findHeaderForAliases(headers, [...PR_SUPPLIER_ALIASES])
+  const invKey = findHeaderForAliases(headers, [...PR_INVOICE_ALIASES])
+  const txKey = findHeaderForAliases(headers, [...PR_TAXABLE_ALIASES])
 
   if (!gstinKey) {
     errors.push("Missing Supplier GSTIN column (e.g. Supplier GSTIN, GSTIN).")
