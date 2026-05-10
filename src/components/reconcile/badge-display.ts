@@ -46,7 +46,7 @@ export function riskSegmentLabel(kind: RiskSegmentKind, row: ReconciliationRow):
     case "none_pill":
       return "None"
     case "itc":
-      return row.itcRisk === "Safe" ? "Low" : row.itcRisk
+      return row.itcRisk
     case "pos":
       return "POS Mismatch"
     default:

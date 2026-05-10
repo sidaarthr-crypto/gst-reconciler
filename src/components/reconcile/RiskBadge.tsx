@@ -7,58 +7,30 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils"
 import type { ITCRiskLevel, ReconciliationRow } from "@/lib/types"
 
-const styles: Record<
-  ITCRiskLevel,
-  { dot: string; pill: string; text: string }
-> = {
-  Critical: {
-    dot: "bg-risk-critical",
-    pill: "bg-risk-critical-bg text-risk-critical",
-    text: "text-risk-critical",
-  },
-  High: {
-    dot: "bg-risk-high",
-    pill: "bg-risk-high-bg text-risk-high",
-    text: "text-risk-high",
-  },
-  Medium: {
-    dot: "bg-risk-medium",
-    pill: "bg-risk-medium-bg text-risk-medium",
-    text: "text-risk-medium",
-  },
-  Low: {
-    dot: "bg-sky-500",
-    pill: "bg-sky-50 text-sky-900",
-    text: "text-sky-900",
-  },
-  Safe: {
-    dot: "bg-risk-safe",
-    pill: "bg-risk-safe-bg text-risk-safe",
-    text: "text-risk-safe",
-  },
-  None: {
-    dot: "bg-slate-400",
-    pill: "bg-slate-100 text-slate-600",
-    text: "text-slate-600",
-  },
+/** Dot + label only (no filled pill). Medium uses darker label text for contrast on amber. */
+const RISK_DOT: Record<ITCRiskLevel, { dot: string; labelClass: string }> = {
+  Critical: { dot: "bg-[#C0392B]", labelClass: "text-slate-800" },
+  High: { dot: "bg-[#E67E22]", labelClass: "text-slate-800" },
+  Medium: { dot: "bg-[#F39C12]", labelClass: "text-[#1A1A1A]" },
+  Low: { dot: "bg-[#2980B9]", labelClass: "text-slate-800" },
+  Safe: { dot: "bg-[#27AE60]", labelClass: "text-slate-800" },
+  None: { dot: "bg-[#95A5A6]", labelClass: "text-slate-800" },
 }
 
-/** Visible risk word only (never combined with status/check names). Safe maps to “Low” per product copy. */
 function riskLevelWord(level: ITCRiskLevel): string {
-  if (level === "Safe") return "Low"
   return level
 }
 
-function RiskLevelPill({ level }: { level: ITCRiskLevel }) {
-  const s = styles[level]
+function RiskLevelRow({ level }: { level: ITCRiskLevel }) {
+  const s = RISK_DOT[level]
   return (
     <span
       className={cn(
-        "inline-flex max-w-max shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
-        s.pill,
+        "inline-flex max-w-max shrink-0 items-center gap-1.5 text-xs font-medium whitespace-nowrap",
+        s.labelClass,
       )}
     >
-      <span className={cn("h-2 w-2 shrink-0 rounded-full", s.dot)} />
+      <span className={cn("h-2 w-2 shrink-0 rounded-full", s.dot)} aria-hidden />
       {riskLevelWord(level)}
     </span>
   )
@@ -79,7 +51,7 @@ export function RiskBadge({
   if (variant === "compact") {
     return (
       <span className="inline-flex flex-col items-start gap-0.5">
-        <RiskLevelPill level={level} />
+        <RiskLevelRow level={level} />
         {restLabels.length > 0 ? (
           <Tooltip>
             <TooltipTrigger
@@ -96,5 +68,5 @@ export function RiskBadge({
     )
   }
 
-  return <RiskLevelPill level={level} />
+  return <RiskLevelRow level={level} />
 }

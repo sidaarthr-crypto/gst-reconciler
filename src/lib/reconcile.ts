@@ -1008,6 +1008,14 @@ function generateBaseAction(
     }
   }
 
+  if (status === "ITC Reduced by Supplier") {
+    return {
+      action:
+        "Supplier has filed a lower ITC amount on the portal than what your books show. Maximum claimable ITC is the portal amount. Adjust your books accordingly.",
+      urgency: "Before Filing",
+    }
+  }
+
   if (itcAvailable === "T") {
     return {
       action: `ITC for Invoice ${inv} is temporarily unavailable in GSTR-2B. Monitor next month's GSTR-2B. Do NOT claim yet.`,

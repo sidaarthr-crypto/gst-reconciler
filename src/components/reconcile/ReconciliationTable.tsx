@@ -37,44 +37,23 @@ export type ReconciliationTableFilterBarProps = {
 const STATUS_BADGE_TABLE_CLASS =
   "h-auto min-h-0 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap border-border"
 
-/** Only these words may appear in the RISK column (Safe maps to Low for display). */
-const VALID_RISK_LEVELS = new Set(["Critical", "High", "Medium", "Low", "None"])
+/** Only these words may appear in the RISK column (+N more tooltips). */
+const VALID_RISK_LEVELS = new Set(["Critical", "High", "Medium", "Low", "Safe", "None"])
 
 /** Strip risk-tier words from STATUS “+N more” counts and tooltips. */
 const STATUS_LABEL_EXCLUSIONS = new Set(["Critical", "High", "Medium", "Low", "None"])
 
-const RISK_PILL_STYLES: Record<
-  ITCRiskLevel,
-  { dot: string; pill: string }
-> = {
-  Critical: {
-    dot: "bg-risk-critical",
-    pill: "bg-risk-critical-bg text-risk-critical",
-  },
-  High: {
-    dot: "bg-risk-high",
-    pill: "bg-risk-high-bg text-risk-high",
-  },
-  Medium: {
-    dot: "bg-risk-medium",
-    pill: "bg-risk-medium-bg text-risk-medium",
-  },
-  Low: {
-    dot: "bg-sky-500",
-    pill: "bg-sky-50 text-sky-900",
-  },
-  Safe: {
-    dot: "bg-risk-safe",
-    pill: "bg-risk-safe-bg text-risk-safe",
-  },
-  None: {
-    dot: "bg-slate-400",
-    pill: "bg-slate-100 text-slate-600",
-  },
+/** Dot + label only — matches RiskBadge (no filled pill). */
+const RISK_DOT_STYLES: Record<ITCRiskLevel, { dot: string; labelClass: string }> = {
+  Critical: { dot: "bg-[#C0392B]", labelClass: "text-slate-800" },
+  High: { dot: "bg-[#E67E22]", labelClass: "text-slate-800" },
+  Medium: { dot: "bg-[#F39C12]", labelClass: "text-[#1A1A1A]" },
+  Low: { dot: "bg-[#2980B9]", labelClass: "text-slate-800" },
+  Safe: { dot: "bg-[#27AE60]", labelClass: "text-slate-800" },
+  None: { dot: "bg-[#95A5A6]", labelClass: "text-slate-800" },
 }
 
 function riskLevelDisplayWord(level: ITCRiskLevel): string {
-  if (level === "Safe") return "Low"
   return level
 }
 
@@ -87,15 +66,15 @@ function distinctTableRiskLabels(row: ReconciliationRow): string[] {
 }
 
 function TableRiskLevelPill({ level }: { level: ITCRiskLevel }) {
-  const s = RISK_PILL_STYLES[level]
+  const s = RISK_DOT_STYLES[level]
   return (
     <span
       className={cn(
-        "inline-flex max-w-max shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
-        s.pill,
+        "inline-flex max-w-max shrink-0 items-center gap-1.5 text-xs font-medium whitespace-nowrap",
+        s.labelClass,
       )}
     >
-      <span className={cn("h-2 w-2 shrink-0 rounded-full", s.dot)} />
+      <span className={cn("h-2 w-2 shrink-0 rounded-full", s.dot)} aria-hidden />
       {riskLevelDisplayWord(level)}
     </span>
   )
@@ -221,18 +200,20 @@ function InvoiceTable({
   return (
     <div className="relative max-w-full overflow-x-auto overflow-y-auto rounded-lg border border-slate-200 bg-white [-webkit-overflow-scrolling:touch] max-h-[400px] lg:max-h-[600px]">
       <table className="w-full min-w-[800px] table-auto divide-y divide-slate-200 text-base">
-        <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-500 uppercase [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]">
+        <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold tracking-wider text-slate-500 uppercase shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
           <tr>
-            <th className="sticky left-0 z-30 w-20 whitespace-nowrap border-r border-slate-200 bg-slate-50 px-3 py-3 shadow-[2px_0_8px_-2px_rgba(15,28,46,0.06)]">
-              Risk
+            <th className="sticky top-0 left-0 z-40 w-20 whitespace-nowrap border-r border-slate-200 bg-slate-50 px-3 py-3 font-semibold tracking-wider text-slate-500 uppercase shadow-[2px_0_8px_-2px_rgba(15,28,46,0.06)]">
+              RISK
             </th>
-            <th className="min-w-[140px] whitespace-nowrap px-3 py-3">Status</th>
-            <th className="min-w-[110px] whitespace-nowrap px-3 py-3">Urgency</th>
-            <th className="min-w-[170px] whitespace-nowrap px-3 py-3">Supplier</th>
-            <th className="w-[130px] whitespace-nowrap px-3 py-3">Invoice No</th>
-            <th className="w-[90px] whitespace-nowrap px-3 py-3">Invoice Date</th>
-            <th className="w-[110px] whitespace-nowrap px-3 py-3 text-right">ITC At Risk</th>
-            <th className="w-20 whitespace-nowrap px-3 py-3">Details</th>
+            <th className="sticky top-0 z-20 min-w-[140px] whitespace-nowrap bg-slate-50 px-3 py-3">Status</th>
+            <th className="sticky top-0 z-20 min-w-[110px] whitespace-nowrap bg-slate-50 px-3 py-3">Urgency</th>
+            <th className="sticky top-0 z-20 min-w-[170px] whitespace-nowrap bg-slate-50 px-3 py-3">Supplier</th>
+            <th className="sticky top-0 z-20 w-[130px] whitespace-nowrap bg-slate-50 px-3 py-3">Invoice No</th>
+            <th className="sticky top-0 z-20 w-[90px] whitespace-nowrap bg-slate-50 px-3 py-3">Invoice Date</th>
+            <th className="sticky top-0 z-20 w-[110px] whitespace-nowrap bg-slate-50 px-3 py-3 text-right">
+              ITC At Risk
+            </th>
+            <th className="sticky top-0 z-20 w-20 whitespace-nowrap bg-slate-50 px-3 py-3">Details</th>
           </tr>
         </thead>
         <tbody>

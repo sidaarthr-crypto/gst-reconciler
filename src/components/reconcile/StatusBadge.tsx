@@ -1,5 +1,3 @@
-import { Clock } from "lucide-react"
-
 import { buildStatusSegments } from "@/components/reconcile/badge-display"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -42,7 +40,8 @@ const map: Record<
       "border-sky-500/60 bg-transparent text-sky-900 hover:bg-sky-50",
   },
   "QRMP Delay": {
-    className: "border-transparent bg-[#F1F5F9] text-[#475569] hover:bg-slate-200/80",
+    className:
+      "border-slate-400/60 bg-transparent text-slate-700 hover:bg-slate-100",
   },
   Duplicate: {
     className:
@@ -133,18 +132,6 @@ export function StatusBadge({
   /** Merged into the badge; use for layout contexts (e.g. reconcile table density). */
   className?: string
 }) {
-  if (status === "QRMP Delay") {
-    return (
-      <Badge
-        variant="outline"
-        className={cn("whitespace-nowrap font-medium", map[status].className, className)}
-      >
-        <Clock className="mr-1 h-3 w-3 shrink-0" aria-hidden />
-        {labelOverride ?? "QRMP Delay"}
-      </Badge>
-    )
-  }
-
   return (
     <Badge variant="outline" className={cn("whitespace-nowrap font-medium", map[status].className, className)}>
       {labelOverride ?? status}
