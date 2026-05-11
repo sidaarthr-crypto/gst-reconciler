@@ -17,6 +17,13 @@ function num(v: number | null | undefined): string | null {
   return String(v)
 }
 
+function sanitiseTaxRate(val: unknown): string | null {
+  const n = typeof val === "number" ? val : Number.parseFloat(String(val ?? ""))
+  if (!Number.isFinite(n) || n < 0 || n > 999) return null
+  const rounded = Math.round(n * 100) / 100
+  return String(rounded)
+}
+
 function mapGstr2bRow(
   sessionId: string,
   requestId: string,
@@ -47,7 +54,7 @@ function mapGstr2bRow(
     cgst: num(row.cgst),
     sgst: num(row.sgst),
     cess: num(row.cess),
-    tax_rate: num(row.taxRate),
+    tax_rate: sanitiseTaxRate(row.taxRate),
     normalised_gstin: ng,
     normalised_inv_no: ni,
     match_key: makeMatchKey(row.supplierGSTIN, row.invoiceNumber),
