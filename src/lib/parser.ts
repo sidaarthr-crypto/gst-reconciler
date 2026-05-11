@@ -1045,7 +1045,8 @@ function filterGstr2bRowsByTyp(
       skipped++
       continue
     }
-    if (typ === "R" || typ === "B2B" || typ === "") {
+    // GSTN exports vary: some files use "R"/"B2B", others spell "Regular".
+    if (typ === "R" || typ === "B2B" || typ === "" || typ === "REGULAR" || typ === "REG") {
       kept.push(row)
       continue
     }
@@ -1127,29 +1128,11 @@ export async function parseGSTR2BFile(
 
     const located = findGstr2bMatrixAndHeaders(workbook, analysis.b2bSheetName)
     if (!located) {
-      const validation = validateGSTR2BFile(
-        [],
-        [],
-        true,
-        foundSheets,
-        sheetHints,
-        {
-          totalRowsParsed: 0,
-          skippedRowCount: 0,
-          b2bRowCountAfterTypFilter: 0,
-        },
-        [],
+      // Do not run validation until we have actual parsed headers/rows.
+      // If we cannot locate the B2B sheet matrix / header detection, treat as a parse failure.
+      throw new ParseError(
+        "Could not find the GSTR-2B B2B header row / data in this workbook. Make sure you uploaded the official GSTR-2B file downloaded from GSTN (with a 'B2B' sheet) and that it contains regular invoice rows.",
       )
-      return {
-        rows: [],
-        filename: file.name,
-        rowCount: 0,
-        totalParsed: 0,
-        skipped: 0,
-        errors: [],
-        validation,
-        ...recipientFields(),
-      }
     }
 
     const { matrix, detection } = located
