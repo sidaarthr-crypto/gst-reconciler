@@ -254,8 +254,22 @@ function InvoiceTable({
                   <p className="truncate text-base font-medium text-slate-800">{row.supplierName}</p>
                   <p className="truncate font-mono text-xs text-slate-400">{row.supplierGSTIN}</p>
                 </td>
-                <td className="w-[130px] px-3 py-3 align-middle font-mono text-xs truncate" title={row.invoiceNumber}>
-                  {row.invoiceNumber}
+                <td className="w-[130px] px-3 py-3 align-middle font-mono text-xs" title={row.invoiceNumber}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="truncate">{row.invoiceNumber}</span>
+                    {row.documentType && row.documentType !== "B2B" && (
+                      <span className={cn(
+                        "inline-block w-fit rounded px-1 py-0 text-[10px] font-semibold leading-4 tracking-wide",
+                        row.documentType === "B2BA"    && "bg-blue-50 text-blue-600",
+                        row.documentType === "CDNR"    && "bg-red-50 text-red-500",
+                        row.documentType === "CDNR-DN" && "bg-green-50 text-green-600",
+                      )}>
+                        {row.documentType === "B2BA"    ? "AMENDED"  : 
+                         row.documentType === "CDNR"    ? "CR NOTE"  : 
+                         row.documentType === "CDNR-DN" ? "DR NOTE"  : null}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="w-[90px] px-3 py-3 align-middle text-xs">{row.invoiceDate}</td>
                 <td

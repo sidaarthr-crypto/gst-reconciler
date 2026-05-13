@@ -129,6 +129,10 @@ export interface PurchaseRegisterRow {
   taxRate?: number
   /** Booked ITC / ITC claimed in books from PR column (when present); used for Q-8 Unclaimed ITC. */
   itcAmount?: number | null
+  /** Note number for credit/debit note rows from PR */
+  noteNumber?: string
+  /** Note type: C = credit note, D = debit note */
+  noteType?: string
 }
 
 export interface ReconciliationRow {

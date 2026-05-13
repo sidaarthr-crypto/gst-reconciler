@@ -731,8 +731,9 @@ export function isSafeMatchedRow(r: ReconciliationRow): boolean {
 
 /** Per-row ITC at risk after status and ITC risk are final (incl. QRMP override). */
 export function computeRowTotalITCAtRisk(r: ReconciliationRow): number {
-  const sum2B = (r.igst2B ?? 0) + (r.cgst2B ?? 0) + (r.sgst2B ?? 0)
-  const sumPR = (r.igstPR ?? 0) + (r.cgstPR ?? 0) + (r.sgstPR ?? 0)
+  // Credit notes have negative tax values — use absolute for ITC at risk display
+  const sum2B = Math.abs(r.igst2B ?? 0) + Math.abs(r.cgst2B ?? 0) + Math.abs(r.sgst2B ?? 0)
+  const sumPR = Math.abs(r.igstPR ?? 0) + Math.abs(r.cgstPR ?? 0) + Math.abs(r.sgstPR ?? 0)
   if (r.status === "QRMP Delay") return 0
   if (r.status === "Matched" && r.itcRisk === "Safe" && r.isPOSMismatch !== true && !r.isDeadlineExpired) {
     return 0
@@ -969,6 +970,18 @@ function generateBaseAction(
   }
 
   if (status === "In PR Only") {
+    // Credit/debit note rows in PR with no portal counterpart — different message
+    const invLower = inv.toLowerCase()
+    const isNoteRow =
+      invLower.includes("/cn/") ||
+      invLower.includes("/dn/") ||
+      (b2b === undefined && pr !== undefined && pr.noteType !== undefined)
+    if (isNoteRow) {
+      return {
+        action: `Credit/Debit note ${inv} exists in your Purchase Register but has no matching entry in GSTR-2B. Verify with supplier ${gstin} whether this note was filed. If not required, reverse in books.`,
+        urgency: "Before Filing",
+      }
+    }
     return {
       action: `Supplier ${gstin} has NOT filed GSTR-1. Invoice ${inv} is missing from GSTR-2B. Do NOT claim ${itcStr} ITC until supplier files. Send follow-up requesting GSTR-1 filing.`,
       urgency: "Immediate",
@@ -979,6 +992,13 @@ function generateBaseAction(
     return {
       action: `Invoice ${inv} falls 1–2 months before this GSTR-2B period and is not yet reflected — supplier may file late. Check next month's GSTR-2B before treating as a definitive missing invoice.`,
       urgency: "Monitor",
+    }
+  }
+
+  if (status === "Unclaimed ITC") {
+    return {
+      action: `Eligible ITC of ${itcStr} exists in GSTR-2B for Invoice ${inv} but has not been booked in your Purchase Register. Book the credit before the Section 16(4) deadline to avoid permanent loss.`,
+      urgency: "Before Filing",
     }
   }
 
@@ -1009,6 +1029,13 @@ function generateBaseAction(
     return {
       action: "No GSTIN and zero tax. Excluded from GST reconciliation scope.",
       urgency: "None",
+    }
+  }
+
+  if (status === "Partially Booked ITC") {
+    return {
+      action: `ITC in books for Invoice ${inv} is lower than the GSTR-2B portal amount. Appears to be partially booked. Verify if the remaining credit of ${itcStr} is yet to be claimed before the Section 16(4) deadline.`,
+      urgency: "Before Filing",
     }
   }
 
@@ -1293,6 +1320,8 @@ function runCrossGstinMatchingPasses(
     if (consumedPR.has(pk)) continue
     const tp = sumGstLines(pr)
     const g = pr.supplierGSTIN.trim()
+    // Skip zero-tax rows (credit/debit note stubs from PR)
+    if (tp === 0) continue
     for (const b2b of gstr2bMain) {
       const bk = reconcileMatchKey(b2b.supplierGSTIN, b2b.invoiceNumber)
       if (consumedB2B.has(bk)) continue
@@ -1455,6 +1484,15 @@ function applyPostMatchQueryChecks(
     const b2b = resolveB2BForQuery(row, map2B)
     const pr = mapPR.get(row.matchKey)
     if (!b2b || !pr) continue
+
+    // Credit/debit notes matched at zero PR amounts are correct — skip post-checks
+    // that would falsely flag them as ITC Reduced or Unclaimed
+    if (
+      (row.documentType === "CDNR" || row.documentType === "CDNR-DN") &&
+      isMatchLikeStatus(row.status)
+    ) {
+      continue
+    }
 
     const allowDebitNote =
       isMatchLikeStatus(row.status) || row.status === "Value Mismatch"
@@ -1780,6 +1818,86 @@ export async function reconcileB2B(
     const key = reconcileMatchKey(row.supplierGSTIN, row.invoiceNumber)
     if (!mapPR.has(key)) mapPR.set(key, row)
   })
+
+  // B2BA: also index by rawInvoiceNumber (original invoice no.) so PR can find them
+  // The PR has the original invoice number, not the amended one
+  for (const b2b of gstr2bMain) {
+    if (b2b.documentType !== "B2BA") continue
+    const raw = b2b.rawInvoiceNumber?.trim()
+    if (!raw || raw === b2b.invoiceNumber) continue
+    const altKey = reconcileMatchKey(b2b.supplierGSTIN, raw)
+    if (!map2B.has(altKey)) {
+      map2B.set(altKey, b2b)
+    }
+  }
+
+  // ── B2BA Pre-pass: match amended invoices by original invoice number ─────
+  // B2BA rows have invoiceNumber = amended number, rawInvoiceNumber = original number.
+  // The PR has the original invoice number. Match on original number first.
+  for (const b2b of gstr2bMain) {
+    if (b2b.documentType !== "B2BA") continue
+    const bk = reconcileMatchKey(b2b.supplierGSTIN, b2b.invoiceNumber)
+    if (consumedB2B.has(bk)) continue
+
+    const origInvNum = (b2b.rawInvoiceNumber ?? "").trim()
+    if (!origInvNum || origInvNum === b2b.invoiceNumber) continue
+
+    const altKey = reconcileMatchKey(b2b.supplierGSTIN, origInvNum)
+    const pr = mapPR.get(altKey)
+    if (!pr || consumedPR.has(altKey)) continue
+
+    consumedB2B.add(bk)
+    consumedPR.add(altKey)
+
+    const extras = defaultRowFields()
+    let rowStatus: MismatchStatus = "Matched"
+
+    const itcAvailRes = applyItcAvailabilityStatus(rowStatus, b2b)
+    rowStatus = itcAvailRes.status
+    extras.itcBlockReason = itcAvailRes.itcBlockReason
+
+    if (rowStatus === "Matched" && b2b.reverseCharge === "Y") {
+      rowStatus = "RCM Invoice"
+      extras.isRCM = true
+    }
+
+    const diffs = {
+      taxable: b2b.taxableValue - pr.taxableValue,
+      igst: b2b.igst - pr.igst,
+      cgst: b2b.cgst - pr.cgst,
+      sgst: b2b.sgst - pr.sgst,
+    }
+
+    if (rowStatus === "Matched" && !m1CoreAmountsMatch(b2b, pr, tolerance)) {
+      rowStatus = "Value Mismatch"
+    }
+
+    const totalITCAtRisk = calcITCAtRisk(rowStatus, b2b, pr, {
+      igst: diffs.igst,
+      cgst: diffs.cgst,
+      sgst: diffs.sgst,
+    })
+    const itcRisk = determineBaseRisk(rowStatus, b2b.itcAvailable, totalITCAtRisk)
+    const { action, urgency } = generateBaseAction(
+      rowStatus,
+      b2b.itcAvailable,
+      pr.supplierGSTIN,
+      pr.invoiceNumber,
+      totalITCAtRisk,
+      diffs.taxable,
+      extras.itcBlockReason,
+      b2b,
+      pr,
+    )
+
+    pushPairRow(results, b2b, pr, altKey, rowStatus, itcRisk, action, urgency, tolerance)
+
+    const last = results[results.length - 1]!
+    last.itcBlockReason = extras.itcBlockReason
+    last.isRCM = extras.isRCM === true
+    last.documentType = "B2BA"
+  }
+  // ── End B2BA Pre-pass ────────────────────────────────────────────────────
 
   // M-1 exact (raw inv#) / QRMP / Sec 16(4) / M-3 date gap — before fuzzy & cross-GSTIN.
   for (const pr of prMain) {

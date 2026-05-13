@@ -907,14 +907,11 @@ const CDNR_EXTRA_ALIASES = {
   noteType: {
     aliases: [
       "note type",
-      "type",
       "typ",
       "document type",
-      "note supply type",
-      "supply type",
     ],
     label: "Note Type",
-    examples: "note type, type",
+    examples: "note type, typ",
   },
   noteValue: {
     aliases: [
@@ -1044,8 +1041,9 @@ const CDNR_ALIASES = {
   },
   noteType: {
     aliases: [
-      "note type", "type", "typ", "document type",
-      "note supply type", "supply type",
+      "note type",
+      "typ",
+      "document type",
     ],
   },
   noteValue: {
@@ -2052,6 +2050,21 @@ export async function parsePurchaseRegisterFile(
     ),
   }
 
+  const prNoteNumberCol = findColumn(
+    headers,
+    ["note number", "note no", "credit note no", "debit note no", "note no."],
+    "Note Number",
+    "note number",
+    false,
+  )
+  const prNoteTypeCol = findColumn(
+    headers,
+    ["note type"],
+    "Note Type",
+    "note type",
+    false,
+  )
+
   const identityColumnHeaders = [
     col.supplierGSTIN,
     col.invoiceNumber,
@@ -2065,7 +2078,17 @@ export async function parsePurchaseRegisterFile(
   const rows: PurchaseRegisterRow[] = []
   for (const r of rawRows) {
     const supplierGSTIN = String(getCell(r, col.supplierGSTIN) ?? "").trim()
-    const rawInvoiceNumber = String(getCell(r, col.invoiceNumber) ?? "").trim()
+    let rawInvoiceNumber = String(getCell(r, col.invoiceNumber) ?? "").trim()
+
+    // For credit/debit note rows in PR, Invoice Number may be blank
+    // but Note Number column carries the note reference — use it as invoice number
+    const prNoteNumber = prNoteNumberCol ? String(getCell(r, prNoteNumberCol) ?? "").trim() : ""
+    const prNoteType = prNoteTypeCol ? String(getCell(r, prNoteTypeCol) ?? "").trim().toUpperCase() : ""
+
+    if (!rawInvoiceNumber && prNoteNumber) {
+      rawInvoiceNumber = prNoteNumber
+    }
+
     const invoiceNumber = rawInvoiceNumber
     if (!supplierGSTIN || supplierGSTIN === "-") continue
     if (!invoiceNumber || invoiceNumber === "-") continue
@@ -2078,7 +2101,9 @@ export async function parsePurchaseRegisterFile(
     }
 
     const taxableValue = parseNumber(getCell(r, col.taxableValue))
-    if (taxableValue === 0) {
+    // Suppress ₹0 warning for credit/debit note rows — they intentionally have no taxable value
+    const isNoteRow = Boolean(prNoteNumber)
+    if (taxableValue === 0 && !isNoteRow) {
       errors.push(
         `Warning: Invoice ${invoiceNumber} has taxable value ₹0 — please verify this is intentional.`,
       )
@@ -2119,6 +2144,8 @@ export async function parsePurchaseRegisterFile(
       hsnCode: String(getCell(r, col.hsnCode) ?? "").trim() || undefined,
       ...(taxRate !== undefined ? { taxRate } : {}),
       ...(bookedItc !== undefined ? { itcAmount: bookedItc } : {}),
+      ...(prNoteNumber ? { noteNumber: prNoteNumber } : {}),
+      ...(prNoteType ? { noteType: prNoteType } : {}),
     })
   }
 
