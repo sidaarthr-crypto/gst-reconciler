@@ -1721,7 +1721,46 @@ export async function parseGSTR2BFile(
     }
     gstr2bMatrix = matrix
     if (matrix.length >= 2) {
-      const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(matrix, 1))
+      // Try rows 1-5 individually first (official portal puts it all on row 2)
+      let ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(matrix, 1))
+      // If GSTIN not found, scan rows 2-5 individually and as joined text
+      if (!ex.recipientGSTIN) {
+        const maxScan = Math.min(matrix.length, 6)
+        for (let ri = 1; ri < maxScan; ri++) {
+          const rowText = joinMatrixRowForHeader(matrix, ri)
+          const attempt = extractRecipientDetailsFromRow2Text(rowText)
+          if (attempt.recipientGSTIN && !ex.recipientGSTIN) ex.recipientGSTIN = attempt.recipientGSTIN
+          if (attempt.recipientName && !ex.recipientName) ex.recipientName = attempt.recipientName
+          if (attempt.returnPeriod && !ex.returnPeriod) ex.returnPeriod = attempt.returnPeriod
+        }
+      }
+      // Final fallback: regex scan for bare GSTIN pattern in first 6 rows
+      if (!ex.recipientGSTIN) {
+        const GSTIN_RE = /\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1})\b/
+        const maxScan = Math.min(matrix.length, 6)
+        for (let ri = 0; ri < maxScan; ri++) {
+          const rowText = joinMatrixRowForHeader(matrix, ri)
+          const m = rowText.match(GSTIN_RE)
+          if (m?.[1]) {
+            ex.recipientGSTIN = m[1]
+            break
+          }
+        }
+      }
+      // Return period fallback: look for "March 2026" / "032026" patterns in first 6 rows
+      if (!ex.returnPeriod) {
+        const PERIOD_RE =
+          /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b|\b(\d{2})(\d{4})\b/i
+        const maxScan = Math.min(matrix.length, 6)
+        for (let ri = 0; ri < maxScan; ri++) {
+          const rowText = joinMatrixRowForHeader(matrix, ri)
+          const m = rowText.match(PERIOD_RE)
+          if (m) {
+            ex.returnPeriod = m[0].trim()
+            break
+          }
+        }
+      }
       recipientGSTIN = ex.recipientGSTIN
       recipientName = ex.recipientName
       returnPeriod = ex.returnPeriod
@@ -1768,7 +1807,46 @@ export async function parseGSTR2BFile(
     }
 
     if (located.matrix.length >= 2) {
-      const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(located.matrix, 1))
+      // Try rows 1-5 individually first (official portal puts it all on row 2)
+      let ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(located.matrix, 1))
+      // If GSTIN not found, scan rows 2-5 individually and as joined text
+      if (!ex.recipientGSTIN) {
+        const maxScan = Math.min(located.matrix.length, 6)
+        for (let ri = 1; ri < maxScan; ri++) {
+          const rowText = joinMatrixRowForHeader(located.matrix, ri)
+          const attempt = extractRecipientDetailsFromRow2Text(rowText)
+          if (attempt.recipientGSTIN && !ex.recipientGSTIN) ex.recipientGSTIN = attempt.recipientGSTIN
+          if (attempt.recipientName && !ex.recipientName) ex.recipientName = attempt.recipientName
+          if (attempt.returnPeriod && !ex.returnPeriod) ex.returnPeriod = attempt.returnPeriod
+        }
+      }
+      // Final fallback: regex scan for bare GSTIN pattern in first 6 rows
+      if (!ex.recipientGSTIN) {
+        const GSTIN_RE = /\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1})\b/
+        const maxScan = Math.min(located.matrix.length, 6)
+        for (let ri = 0; ri < maxScan; ri++) {
+          const rowText = joinMatrixRowForHeader(located.matrix, ri)
+          const m = rowText.match(GSTIN_RE)
+          if (m?.[1]) {
+            ex.recipientGSTIN = m[1]
+            break
+          }
+        }
+      }
+      // Return period fallback: look for "March 2026" / "032026" patterns in first 6 rows
+      if (!ex.returnPeriod) {
+        const PERIOD_RE =
+          /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b|\b(\d{2})(\d{4})\b/i
+        const maxScan = Math.min(located.matrix.length, 6)
+        for (let ri = 0; ri < maxScan; ri++) {
+          const rowText = joinMatrixRowForHeader(located.matrix, ri)
+          const m = rowText.match(PERIOD_RE)
+          if (m) {
+            ex.returnPeriod = m[0].trim()
+            break
+          }
+        }
+      }
       recipientGSTIN = ex.recipientGSTIN
       recipientName = ex.recipientName
       returnPeriod = ex.returnPeriod
