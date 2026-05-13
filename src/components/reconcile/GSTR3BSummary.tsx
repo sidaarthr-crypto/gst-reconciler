@@ -87,6 +87,21 @@ async function openPrintSummary(period: string, s: GSTR3BSummary): Promise<void>
     y += 6
   }
 
+  const moneyRowAmountRgb = (
+    label: string,
+    amount: number,
+    amountRgb: readonly [number, number, number],
+  ) => {
+    doc.setFontSize(9)
+    doc.setFont("NotoSans", "normal")
+    doc.setTextColor(...navy)
+    doc.text(label, margin + 3, y)
+    doc.setTextColor(...amountRgb)
+    doc.text(formatINR(amount), pageW - margin - 3, y, { align: "right" })
+    doc.setTextColor(...navy)
+    y += 6
+  }
+
   const divider = () => {
     doc.setDrawColor(226, 232, 240)
     doc.line(margin, y - 2, pageW - margin, y - 2)
@@ -99,6 +114,13 @@ async function openPrintSummary(period: string, s: GSTR3BSummary): Promise<void>
   moneyRow("SGST:", s.eligibleSGST)
   divider()
   moneyRow("Total:", s.eligibleTotal, true)
+  y += 4
+
+  sectionHeader("Credit / Debit Note Adjustments", navy)
+  moneyRowAmountRgb("Credit Notes (reduce ITC):", s.creditNoteITC ?? 0, red)
+  moneyRowAmountRgb("Debit Notes (increase ITC):", s.debitNoteITC ?? 0, green)
+  divider()
+  moneyRow("Net after notes:", s.netAfterNotes ?? s.netClaimableTotal, true)
   y += 4
 
   sectionHeader("✗  Table 4D(1) — Ineligible ITC (Sec 17(5) / ITC blocked)", red)
@@ -126,7 +148,7 @@ async function openPrintSummary(period: string, s: GSTR3BSummary): Promise<void>
   doc.setFontSize(11)
   doc.setFont("NotoSans", "normal")
   doc.setTextColor(...navy)
-  doc.text(`Net ITC for Table 4A(5): ${formatINR(s.netClaimableTotal)}`, margin + 5, y + 8)
+  doc.text(`Net ITC for Table 4A(5): ${formatINR(s.netAfterNotes ?? s.netClaimableTotal)}`, margin + 5, y + 8)
   doc.setFontSize(8)
   doc.setTextColor(...grey)
   doc.text(
@@ -290,9 +312,37 @@ export function GSTR3BSummary({ summary: s, period }: { summary: GSTR3BSummary; 
             </div>
           </div>
 
+          <div className="mt-4 flex flex-col rounded-lg border border-border bg-white shadow-sm">
+            <div className="space-y-2 border-b border-border p-4">
+              <p className="text-[13px] font-semibold text-brand-navy">Credit / Debit Notes</p>
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Credit Notes ITC</span>
+                <span className="font-mono tabular-nums font-medium text-red-600">
+                  {formatINR(s.creditNoteITC ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Debit Notes ITC</span>
+                <span className="font-mono tabular-nums font-medium text-emerald-700">
+                  {formatINR(s.debitNoteITC ?? 0)}
+                </span>
+              </div>
+              <div className="my-2 border-t border-border" />
+              <div className="flex justify-between gap-3 text-sm font-semibold text-brand-navy">
+                <span>Net adjustment</span>
+                <span className="font-mono tabular-nums">
+                  {formatINR((s.creditNoteITC ?? 0) + (s.debitNoteITC ?? 0))}
+                </span>
+              </div>
+            </div>
+            <div className="border-l-4 border-l-slate-400 bg-slate-50 p-3 text-xs text-slate-800/90">
+              Matched, ITC-available credit and debit notes from GSTR-2B (Table 4A adjustments).
+            </div>
+          </div>
+
           <div className="mt-6 rounded-lg border border-blue-100 bg-[#EFF6FF] px-4 py-4 sm:px-5">
             <p className="text-base font-bold text-brand-navy sm:text-lg">
-              Net ITC to enter in GSTR-3B Table 4A(5): {formatINR(s.netClaimableTotal)}
+              Net ITC to enter in GSTR-3B Table 4A(5): {formatINR(s.netAfterNotes ?? s.netClaimableTotal)}
             </p>
             <div className="mt-2 space-y-1 text-xs text-muted-foreground md:mt-1 md:flex md:flex-row md:flex-wrap md:gap-x-4 md:space-y-0 md:text-sm">
               <p>IGST: {formatINR(s.netClaimableIGST)}</p>

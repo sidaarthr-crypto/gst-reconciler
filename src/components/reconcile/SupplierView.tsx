@@ -188,6 +188,7 @@ function syntheticRowForRisk(level: ITCRiskLevel): ReconciliationRow {
     recommendedAction: "",
     actionUrgency: "None",
     riskSortOrder: 0,
+    documentType: "B2B",
   }
 }
 

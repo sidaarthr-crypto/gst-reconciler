@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import type { Database } from "@/lib/database.types"
-import type { GSTR2BRow, PurchaseRegisterRow, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
+import type {
+  DocumentType,
+  GSTR2BRow,
+  PurchaseRegisterRow,
+  ReconciliationRow,
+  ReconciliationSummary,
+} from "@/lib/types"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { buildReconciliationSummary } from "@/lib/reconcile"
@@ -125,7 +131,8 @@ function mapResultRow(
     recommended_action: row.recommendedAction,
     action_urgency: row.actionUrgency,
     risk_sort_order: row.riskSortOrder,
-  }
+    document_type: row.documentType ?? "B2B",
+  } as ResultInsert
 }
 
 async function insertChunks<T extends Record<string, unknown>>(
@@ -177,9 +184,11 @@ function mapDbResult(row: {
   recommended_action: string
   action_urgency: ReconciliationRow["actionUrgency"]
   risk_sort_order: number
+  document_type?: string | null
 }): ReconciliationRow {
   return {
     id: row.id,
+    documentType: ((row.document_type as DocumentType) ?? "B2B") as DocumentType,
     supplierGSTIN: row.supplier_gstin,
     supplierName: row.supplier_name ?? "",
     invoiceNumber: row.invoice_number,
@@ -226,6 +235,9 @@ function mergeSessionSummaryTotals(
     mismatch_count: number | null
     total_itc_at_risk: string | null
     total_itc_safe: string | null
+    b2ba_count?: number | null
+    cdnr_count?: number | null
+    cdn_debit_count?: number | null
   },
   computed: ReconciliationSummary,
 ): ReconciliationSummary {
@@ -243,6 +255,9 @@ function mergeSessionSummaryTotals(
     ...(session.mismatch_count != null ? { issuesFoundCount: session.mismatch_count } : {}),
     ...(itcRisk !== undefined ? { totalITCAtRisk: itcRisk } : {}),
     ...(itcSafe !== undefined ? { totalITCSafe: itcSafe } : {}),
+    ...(session.b2ba_count != null ? { b2baCount: session.b2ba_count } : {}),
+    ...(session.cdnr_count != null ? { cdnrCount: session.cdnr_count } : {}),
+    ...(session.cdn_debit_count != null ? { cdnrDNCount: session.cdn_debit_count } : {}),
   }
 }
 
@@ -373,7 +388,10 @@ export async function POST(
         in_pr_only_count: body.summary.inPROnlyCount,
         total_itc_at_risk: String(body.summary.totalITCAtRisk),
         total_itc_safe: String(body.summary.totalITCSafe),
-      })
+        b2ba_count: body.summary.b2baCount ?? 0,
+        cdnr_count: body.summary.cdnrCount ?? 0,
+        cdn_debit_count: body.summary.cdnrDNCount ?? 0,
+      } as never)
       .eq("id", sessionId)
 
     if (uErr) {

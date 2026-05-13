@@ -5,8 +5,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   AlertTriangle,
+  FileBadge,
   FileSearch,
   FileText,
+  Files,
   ShieldCheck,
   Users,
 } from "lucide-react"
@@ -117,6 +119,27 @@ export default function DashboardPage() {
         iconClass: "text-red-600",
         valueClass: "text-risk-critical",
         pulse: k.totalItcAtRisk > 0,
+      },
+      {
+        title: "B2BA Amendments",
+        value: k.totalB2baCount.toLocaleString("en-IN"),
+        subtitle: "Rows across completed runs",
+        icon: Files,
+        iconClass: "text-sky-600",
+      },
+      {
+        title: "Credit Notes",
+        value: k.totalCdnrCount.toLocaleString("en-IN"),
+        subtitle: "CDNR rows saved",
+        icon: FileBadge,
+        iconClass: "text-amber-600",
+      },
+      {
+        title: "Debit Notes",
+        value: k.totalCdnrDnCount.toLocaleString("en-IN"),
+        subtitle: "CDNR-DN rows saved",
+        icon: FileText,
+        iconClass: "text-indigo-600",
       },
     ]
   }, [data?.kpis])

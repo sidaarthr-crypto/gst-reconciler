@@ -1,3 +1,5 @@
+export type DocumentType = "B2B" | "B2BA" | "CDNR" | "CDNR-DN"
+
 export type ITCStatus = "Y" | "N" | "T"
 export type MismatchStatus =
   | "Matched"
@@ -105,6 +107,8 @@ export interface GSTR2BRow {
   sgst: number
   cess: number
   taxRate: number
+  /** Source sheet / row classification from GSTR-2B workbook (defaults to B2B). */
+  documentType?: DocumentType
 }
 
 export interface PurchaseRegisterRow {
@@ -129,6 +133,7 @@ export interface PurchaseRegisterRow {
 
 export interface ReconciliationRow {
   id?: string
+  documentType: DocumentType
   supplierGSTIN: string
   supplierName: string
   invoiceNumber: string
@@ -225,6 +230,9 @@ export interface ReconciliationSummary {
   deadlineWarningCount: number
   posMismatchCount: number
   totalCESSAtRisk: number
+  b2baCount: number
+  cdnrCount: number
+  cdnrDNCount: number
 }
 
 export interface ReconciliationSession {

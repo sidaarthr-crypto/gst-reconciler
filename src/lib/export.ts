@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx-js-style"
 
 import type {
+  DocumentType,
   ITCRiskLevel,
   MismatchStatus,
   ReconciliationRow,
@@ -544,10 +545,82 @@ function buildSummarySheet(params: {
     border: thinBorder(),
   })
 
+  // Document type breakdown (below status summary)
+  let docRow = dataRow + 2
+  setCell(ws, docRow, 1, "Document Type Breakdown", {
+    font: { name: "Arial", sz: 10, bold: true, color: { rgb: FF("1A3557") } },
+    fill: { patternType: "solid", fgColor: { rgb: FF("EEF3FB") } },
+    alignment: { horizontal: "left", vertical: "center" },
+    border: thinBorder(),
+  })
+  merge(ws, docRow, 1, docRow, 4)
+  docRow += 1
+
+  const docHdr = ["Document Type", "Count", "ITC Impact (₹)", ""]
+  for (let c = 0; c < 4; c++) {
+    setCell(ws, docRow, 1 + c, docHdr[c] ?? "", {
+      font: { name: "Arial", sz: 9, bold: true, color: { rgb: FF("FFFFFF") } },
+      fill: { patternType: "solid", fgColor: { rgb: FF("1E4080") } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: thinBorder(),
+    })
+  }
+  docRow += 1
+
+  const docTypes: { label: string; dt: DocumentType }[] = [
+    { label: "B2B", dt: "B2B" },
+    { label: "B2BA (Amended)", dt: "B2BA" },
+    { label: "Credit Notes", dt: "CDNR" },
+    { label: "Debit Notes", dt: "CDNR-DN" },
+  ]
+  for (let i = 0; i < docTypes.length; i++) {
+    const { label, dt } = docTypes[i]!
+    const grp = rows.filter((r) => r.documentType === dt)
+    const cnt = grp.length
+    const itc = grp.reduce((a, r) => a + r.totalITCAtRisk, 0)
+    const alt = i % 2 === 0 ? "F0F4FB" : "FFFFFF"
+    setCell(ws, docRow, 1, label, {
+      font: baseFont(9, false, "000000"),
+      fill: { patternType: "solid", fgColor: { rgb: FF(alt) } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: thinBorder(),
+    })
+    ws[XLSX.utils.encode_cell({ r: docRow, c: 2 })] = {
+      t: "n",
+      v: cnt,
+      z: NF_INT,
+      s: {
+        font: baseFont(9, false, "000000"),
+        fill: { patternType: "solid", fgColor: { rgb: FF(alt) } },
+        alignment: { horizontal: "right", vertical: "center" },
+        border: thinBorder(),
+      },
+    }
+    const itcColor =
+      itc < 0 ? "27AE60" : itc > 0 ? "C0392B" : "555555"
+    ws[XLSX.utils.encode_cell({ r: docRow, c: 3 })] = {
+      t: "n",
+      v: itc,
+      z: NF_RUPEE,
+      s: {
+        font: baseFont(9, true, itcColor),
+        alignment: { horizontal: "right", vertical: "center" },
+        border: thinBorder(),
+        fill: { patternType: "solid", fgColor: { rgb: FF(alt) } },
+      },
+    }
+    setCell(ws, docRow, 4, "", {
+      font: baseFont(9, false, "000000"),
+      fill: { patternType: "solid", fgColor: { rgb: FF(alt) } },
+      border: thinBorder(),
+    })
+    docRow += 1
+  }
+
   ws["!cols"] = SUMMARY_COL_WIDTHS
   ws["!ref"] = XLSX.utils.encode_range({
     s: { r: 0, c: 0 },
-    e: { r: dataRow, c: 4 },
+    e: { r: docRow - 1, c: 4 },
   })
 
   hideGridlines(ws)
@@ -563,6 +636,36 @@ function buildSummarySheet(params: {
   ]
 
   return ws
+}
+
+/** Replaces the status-based banner from buildDetailSheet with a document-type section title. */
+function rewriteDetailSheetDocTypeBanner(
+  ws: XLSX.WorkSheet,
+  sectionTitle: string,
+  rowCount: number,
+): void {
+  const n = DETAIL_HEADERS.length
+  // buildDetailSheet already merged rows 0–2; avoid duplicate !merges entries.
+  ws["!merges"] = []
+  merge(ws, 0, 0, 0, n - 1)
+  setCell(ws, 0, 0, sectionTitle, {
+    font: { name: "Arial", sz: 13, bold: true, color: { rgb: FF("FFFFFF") } },
+    fill: { patternType: "solid", fgColor: { rgb: FF("1A3557") } },
+    alignment: { horizontal: "center", vertical: "center" },
+  })
+  merge(ws, 1, 0, 1, n - 1)
+  setCell(ws, 1, 0, "Rows filtered by GSTR-2B document type.", {
+    font: baseFont(9, false, "444444"),
+    fill: { patternType: "solid", fgColor: { rgb: FF("EEF3FB") } },
+    alignment: { horizontal: "left", vertical: "center", wrapText: true },
+  })
+  const countLine = `  ${rowCount} invoice(s) in this section`
+  merge(ws, 2, 0, 2, n - 1)
+  setCell(ws, 2, 0, countLine, {
+    font: { name: "Arial", sz: 9, bold: true, color: { rgb: FF("1E4080") } },
+    fill: { patternType: "solid", fgColor: { rgb: FF("D6E4F7") } },
+    alignment: { horizontal: "left", vertical: "center" },
+  })
 }
 
 function buildDetailSheet(
@@ -791,6 +894,20 @@ export function exportReconciliationWorkbook(params: {
 
   const wsSummary = buildSummarySheet(params)
   XLSX.utils.book_append_sheet(wb, wsSummary, "Summary")
+
+  const docTypeSheets: { sheetName: string; docType: DocumentType }[] = [
+    { sheetName: "B2B", docType: "B2B" },
+    { sheetName: "B2BA", docType: "B2BA" },
+    { sheetName: "Credit Notes", docType: "CDNR" },
+    { sheetName: "Debit Notes", docType: "CDNR-DN" },
+  ]
+  for (const { sheetName, docType } of docTypeSheets) {
+    const grp = rows.filter((r) => r.documentType === docType)
+    if (!grp.length) continue
+    const wsDoc = buildDetailSheet("Matched", grp)
+    rewriteDetailSheetDocTypeBanner(wsDoc, sheetName, grp.length)
+    XLSX.utils.book_append_sheet(wb, wsDoc, sheetName)
+  }
 
   const byStatus = groupRowsByStatus(rows)
 

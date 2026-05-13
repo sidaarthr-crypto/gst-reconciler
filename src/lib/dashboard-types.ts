@@ -6,6 +6,12 @@ export type DashboardKpis = {
   totalItcSafe: number
   totalItcAtRisk: number
   lastReconciledAt: string | null
+  /** Sum of B2BA row counts across completed sessions (from saved reconciliation). */
+  totalB2baCount: number
+  /** Sum of CDNR (credit note) row counts across completed sessions. */
+  totalCdnrCount: number
+  /** Sum of CDNR-DN (debit note) row counts across completed sessions. */
+  totalCdnrDnCount: number
 }
 
 export type DashboardMonthlyRow = {
@@ -36,6 +42,9 @@ export type DashboardSessionRow = {
   totalItcSafe: number
   createdAt: string
   completedAt: string | null
+  b2baCount: number
+  cdnrCount: number
+  cdnrDNCount: number
 }
 
 export type DashboardPayload = {

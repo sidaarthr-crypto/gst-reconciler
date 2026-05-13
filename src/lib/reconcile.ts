@@ -1,6 +1,7 @@
 import type {
   ActionUrgency,
   AppConfig,
+  DocumentType,
   GSTR2BRow,
   ITCBlockReason,
   ITCStatus,
@@ -815,6 +816,9 @@ export function buildReconciliationSummary(results: ReconciliationRow[]): Reconc
     deadlineWarningCount: results.filter((r) => r.isDeadlineWarning && !r.isDeadlineExpired).length,
     posMismatchCount: results.filter((r) => r.isPOSMismatch).length,
     totalCESSAtRisk,
+    b2baCount: results.filter((r) => r.documentType === "B2BA").length,
+    cdnrCount: results.filter((r) => r.documentType === "CDNR").length,
+    cdnrDNCount: results.filter((r) => r.documentType === "CDNR-DN").length,
   }
 }
 
@@ -1122,6 +1126,7 @@ function pushPairRow(
     supplierGSTIN: pr.supplierGSTIN,
     supplierName: b2b.supplierName || pr.supplierName,
     invoiceNumber: pr.invoiceNumber,
+    documentType: b2b.documentType ?? "B2B",
     rawInvoiceNumber2B: b2b.rawInvoiceNumber ?? b2b.invoiceNumber,
     rawInvoiceNumberPR: pr.rawInvoiceNumber ?? pr.invoiceNumber,
     normalisedInvoiceNumber2B: normaliseInvoiceNumber(b2b.invoiceNumber),
@@ -1674,6 +1679,7 @@ export async function reconcileB2B(
         supplierGSTIN: base.supplierGSTIN,
         supplierName: (b2b?.supplierName ?? pr?.supplierName) || "",
         invoiceNumber: base.invoiceNumber,
+        documentType: (b2b?.documentType ?? "B2B") as DocumentType,
         rawInvoiceNumber2B: b2b?.rawInvoiceNumber ?? b2b?.invoiceNumber ?? null,
         rawInvoiceNumberPR: pr?.rawInvoiceNumber ?? pr?.invoiceNumber ?? null,
         normalisedInvoiceNumber2B: b2b ? normaliseInvoiceNumber(b2b.invoiceNumber) : null,
@@ -1725,6 +1731,7 @@ export async function reconcileB2B(
       supplierGSTIN: "",
       supplierName: pr.supplierName || "",
       invoiceNumber: pr.invoiceNumber,
+      documentType: "B2B",
       rawInvoiceNumber2B: null,
       rawInvoiceNumberPR: pr.rawInvoiceNumber ?? pr.invoiceNumber ?? null,
       normalisedInvoiceNumber2B: null,
@@ -1986,6 +1993,7 @@ export async function reconcileB2B(
         supplierGSTIN: pr.supplierGSTIN,
         supplierName: best.b2b.supplierName || pr.supplierName,
         invoiceNumber: pr.invoiceNumber,
+        documentType: best.b2b.documentType ?? "B2B",
         rawInvoiceNumber2B: best.b2b.rawInvoiceNumber ?? best.b2b.invoiceNumber,
         rawInvoiceNumberPR: pr.rawInvoiceNumber ?? pr.invoiceNumber,
         normalisedInvoiceNumber2B: normaliseInvoiceNumber(best.b2b.invoiceNumber),
@@ -2218,6 +2226,7 @@ export async function reconcileB2B(
       supplierGSTIN: base.supplierGSTIN,
       supplierName: b2b?.supplierName ?? pr?.supplierName ?? "",
       invoiceNumber: base.invoiceNumber,
+      documentType: (b2b?.documentType ?? "B2B") as DocumentType,
       rawInvoiceNumber2B: b2b?.rawInvoiceNumber ?? b2b?.invoiceNumber ?? null,
       rawInvoiceNumberPR: pr?.rawInvoiceNumber ?? pr?.invoiceNumber ?? null,
       normalisedInvoiceNumber2B: b2b ? normaliseInvoiceNumber(b2b.invoiceNumber) : null,
@@ -2343,6 +2352,14 @@ export interface GSTR3BSummary {
   netClaimableCGST: number
   netClaimableSGST: number
   netClaimableTotal: number
+  /** Sum of 2B-side IGST+CGST+SGST for matched-safe B2BA rows (informational). */
+  b2baITC: number
+  /** Matched-safe CDNR: sum of 2B taxes (negative reduces claim). */
+  creditNoteITC: number
+  /** Matched-safe CDNR-DN: sum of 2B taxes (positive). */
+  debitNoteITC: number
+  /** Net 4A(5) guidance after note adjustments. */
+  netAfterNotes: number
 }
 
 function sumTax2B(rows: ReconciliationRow[]): { igst: number; cgst: number; sgst: number; total: number } {
@@ -2395,13 +2412,13 @@ function sumTaxQrmpDeferred(rows: ReconciliationRow[]): {
 }
 
 export function calculateGSTR3BSummary(rows: ReconciliationRow[]): GSTR3BSummary {
-  const eligibleRows = rows.filter(
-    (r) =>
-      r.status === "Matched" &&
-      r.itcRisk === "Safe" &&
-      r.itcAvailable === "Y" &&
-      r.isPOSMismatch !== true,
-  )
+  const eligiblePredicate = (r: ReconciliationRow) =>
+    r.status === "Matched" &&
+    r.itcRisk === "Safe" &&
+    r.itcAvailable === "Y" &&
+    r.isPOSMismatch !== true
+
+  const eligibleRows = rows.filter(eligiblePredicate)
   const ineligibleRows = rows.filter((r) => r.itcAvailable === "N")
   const deferredRows = rows.filter((r) => r.status === "In PR Only" && !r.isDeadlineExpired)
   const qrmpRows = rows.filter((r) => r.status === "QRMP Delay")
@@ -2410,6 +2427,21 @@ export function calculateGSTR3BSummary(rows: ReconciliationRow[]): GSTR3BSummary
   const i = sumTax2B(ineligibleRows)
   const d = sumTaxPR(deferredRows)
   const q = sumTaxQrmpDeferred(qrmpRows)
+
+  const eligibleB2bBa = eligibleRows.filter(
+    (r) => r.documentType === "B2B" || r.documentType === "B2BA" || r.documentType === undefined,
+  )
+  const eCore = sumTax2B(eligibleB2bBa)
+
+  const eligibleCdnr = eligibleRows.filter((r) => r.documentType === "CDNR")
+  const eligibleDn = eligibleRows.filter((r) => r.documentType === "CDNR-DN")
+  const eligibleB2baOnly = eligibleRows.filter((r) => r.documentType === "B2BA")
+
+  const creditNoteITC = sumTax2B(eligibleCdnr).total
+  const debitNoteITC = sumTax2B(eligibleDn).total
+  const b2baITC = sumTax2B(eligibleB2baOnly).total
+
+  const netAfterNotes = eCore.total + creditNoteITC + debitNoteITC
 
   return {
     eligibleIGST: e.igst,
@@ -2432,5 +2464,9 @@ export function calculateGSTR3BSummary(rows: ReconciliationRow[]): GSTR3BSummary
     netClaimableCGST: e.cgst,
     netClaimableSGST: e.sgst,
     netClaimableTotal: e.total,
+    b2baITC,
+    creditNoteITC,
+    debitNoteITC,
+    netAfterNotes,
   }
 }

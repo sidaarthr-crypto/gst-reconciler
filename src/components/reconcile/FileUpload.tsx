@@ -92,6 +92,15 @@ export function FileUpload({
   const [pickerBusy, setPickerBusy] = useState(false)
   const [removeBusy, setRemoveBusy] = useState(false)
 
+  const inputAccept =
+    fileKind === "gstr2b" ? ".csv,.xlsx,.xls,.json,application/json" : ".csv,.xlsx,.xls"
+  const acceptsHint =
+    fileKind === "gstr2b" ? "Accepts .xlsx, .csv and .json" : "Accepts .xlsx and .csv"
+  const showJsonBadge =
+    fileKind === "gstr2b" &&
+    parseResult != null &&
+    parseResult.filename.toLowerCase().endsWith(".json")
+
   const effectiveCount = parseResult?.rowCount ?? rowCount
   const validation = parseResult?.validation
 
@@ -150,6 +159,14 @@ export function FileUpload({
           <AlertCircle className="mt-0.5 h-7 w-7 shrink-0 text-red-600" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="font-mono text-sm font-medium text-brand-navy">{displayName}</p>
+            {showJsonBadge ? (
+              <Badge
+                variant="outline"
+                className="mt-2 border-sky-300 bg-sky-50 text-xs font-medium text-sky-950 hover:bg-sky-50"
+              >
+                JSON format detected
+              </Badge>
+            ) : null}
             <p className="mt-1 text-sm font-semibold text-red-900">
               {gstrInvalidTitle ? "✗ Not a valid GSTR-2B file" : "File verification failed"}
             </p>
@@ -183,7 +200,7 @@ export function FileUpload({
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.xlsx,.xls"
+          accept={inputAccept}
           className="hidden"
           onChange={onInputChange}
         />
@@ -197,6 +214,14 @@ export function FileUpload({
       <div className="flex min-h-[160px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-red-300 bg-red-50 px-4 py-6 text-center">
         <AlertCircle className="h-8 w-8 text-red-600" aria-hidden />
         <p className="text-sm font-medium text-red-800">{msg}</p>
+        {showJsonBadge ? (
+          <Badge
+            variant="outline"
+            className="border-sky-300 bg-sky-50 text-xs font-medium text-sky-950 hover:bg-sky-50"
+          >
+            JSON format detected
+          </Badge>
+        ) : null}
         <button
           type="button"
           disabled={pickerBusy}
@@ -218,7 +243,7 @@ export function FileUpload({
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.xlsx,.xls"
+          accept={inputAccept}
           className="hidden"
           onChange={onInputChange}
         />
@@ -323,7 +348,7 @@ export function FileUpload({
           <input
             ref={inputRef}
             type="file"
-            accept=".csv,.xlsx,.xls"
+            accept={inputAccept}
             className="hidden"
             onChange={onInputChange}
           />
@@ -354,6 +379,14 @@ export function FileUpload({
                 {effectiveCount} B2B invoices found
                 {volumeCountHighlight ? " ⚠️" : ""}
               </Badge>
+              {showJsonBadge ? (
+                <Badge
+                  variant="outline"
+                  className="border-sky-300 bg-sky-50 text-xs font-medium text-sky-950 hover:bg-sky-50"
+                >
+                  JSON format detected
+                </Badge>
+              ) : null}
             </div>
 
             {conf === "high" ? (
@@ -471,7 +504,7 @@ export function FileUpload({
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,.xlsx,.xls"
+          accept={inputAccept}
           className="hidden"
           onChange={onInputChange}
         />
@@ -513,11 +546,16 @@ export function FileUpload({
       )}
       <span className="text-xs text-muted-foreground">{subtitle}</span>
       <span className="text-xs text-muted-foreground">Drag & drop or click to browse</span>
-      <span className="text-[11px] text-muted-foreground">Accepts .xlsx and .csv</span>
+      <span className="text-[11px] text-muted-foreground">{acceptsHint}</span>
+      {fileKind === "gstr2b" ? (
+        <span className="text-xs text-muted-foreground">
+          B2BA amendments and Credit/Debit Notes auto-detected from the same file
+        </span>
+      ) : null}
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,.xlsx,.xls"
+        accept={inputAccept}
         className="hidden"
         onChange={onInputChange}
       />

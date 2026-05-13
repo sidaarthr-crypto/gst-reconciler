@@ -310,7 +310,7 @@ export default function ReconcilePage() {
               <CardContent>
                 <FileUpload
                   label="GSTR-2B export"
-                  subtitle="Excel or CSV from GSTN"
+                  subtitle="Excel, CSV, or official JSON from GSTN"
                   accentClass="text-brand-blue"
                   uploading={parsingTarget === "gstr2b"}
                   parseResult={gstr2bParseResult}

@@ -12,6 +12,13 @@ import { normaliseGSTIN } from "@/lib/utils"
 
 type SessionRow = Database["public"]["Tables"]["reconciliation_sessions"]["Row"]
 
+/** DB columns added in migration 010 — optional until database.types is regenerated. */
+type SessionRowWithDocCounts = SessionRow & {
+  b2ba_count?: number | null
+  cdnr_count?: number | null
+  cdn_debit_count?: number | null
+}
+
 function num(v: string | number | null | undefined): number {
   if (v === null || v === undefined) return 0
   const n = typeof v === "number" ? v : Number(v)
@@ -52,6 +59,7 @@ function buildMonthlyData(
 }
 
 function mapSessionRow(s: SessionRow): DashboardSessionRow {
+  const sx = s as SessionRowWithDocCounts
   return {
     id: s.id,
     requestId: s.request_id,
@@ -71,6 +79,9 @@ function mapSessionRow(s: SessionRow): DashboardSessionRow {
     totalItcSafe: num(s.total_itc_safe),
     createdAt: s.created_at,
     completedAt: s.completed_at,
+    b2baCount: sx.b2ba_count ?? 0,
+    cdnrCount: sx.cdnr_count ?? 0,
+    cdnrDNCount: sx.cdn_debit_count ?? 0,
   }
 }
 
@@ -90,9 +101,7 @@ export async function GET(req: NextRequest) {
 
     let metricsQ = supabase
       .from("reconciliation_sessions")
-      .select(
-        "id, client_gstin, status, total_itc_safe, total_itc_at_risk, created_at, reconciliation_period_month, reconciliation_period_year, total_invoices",
-      )
+      .select("*")
       .eq("user_id", user.id)
 
     let listQ = supabase
@@ -116,20 +125,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: listRes.error.message }, { status: 500 })
     }
 
-    const kpiRows = (metricsRes.data ?? []) as Pick<
-      SessionRow,
-      | "id"
-      | "client_gstin"
-      | "status"
-      | "total_itc_safe"
-      | "total_itc_at_risk"
-      | "created_at"
-      | "reconciliation_period_month"
-      | "reconciliation_period_year"
-      | "total_invoices"
-    >[]
+    const kpiRows = (metricsRes.data ?? []) as unknown as SessionRowWithDocCounts[]
 
-    const list = (listRes.data ?? []) as SessionRow[]
+    const list = (listRes.data ?? []) as unknown as SessionRowWithDocCounts[]
     const completed = kpiRows.filter((s) => s.status === "completed")
 
     const distinctGstin = new Set(
@@ -150,6 +148,9 @@ export async function GET(req: NextRequest) {
       totalItcSafe: completed.reduce((a, s) => a + num(s.total_itc_safe), 0),
       totalItcAtRisk: completed.reduce((a, s) => a + num(s.total_itc_at_risk), 0),
       lastReconciledAt,
+      totalB2baCount: completed.reduce((a, s) => a + num(s.b2ba_count), 0),
+      totalCdnrCount: completed.reduce((a, s) => a + num(s.cdnr_count), 0),
+      totalCdnrDnCount: completed.reduce((a, s) => a + num(s.cdn_debit_count), 0),
     }
 
     const monthlyData = buildMonthlyData(completed).slice(0, 12)

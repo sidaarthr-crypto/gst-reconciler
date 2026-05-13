@@ -10,7 +10,13 @@ import { ReconciliationTable } from "@/components/reconcile/ReconciliationTable"
 import { SummaryCards } from "@/components/reconcile/SummaryCards"
 import { Button } from "@/components/ui/button"
 import { exportReconciliationWorkbook } from "@/lib/export"
-import type { ActionUrgency, ReconciliationFilterId, ReconciliationRow, ReconciliationSummary } from "@/lib/types"
+import type {
+  ActionUrgency,
+  DocumentType,
+  ReconciliationFilterId,
+  ReconciliationRow,
+  ReconciliationSummary,
+} from "@/lib/types"
 import { useAuth } from "@/hooks/useAuth"
 import { calculateGSTR3BSummary } from "@/lib/reconcile"
 import { cn, getMonthName } from "@/lib/utils"
@@ -32,6 +38,20 @@ type SessionPayload = {
   completedAt?: string
 }
 
+type DocTypeTab = "all" | DocumentType
+
+const DOC_TYPE_TABS: { id: DocTypeTab; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "B2B", label: "B2B" },
+  { id: "B2BA", label: "B2BA" },
+  { id: "CDNR", label: "Credit Notes" },
+  { id: "CDNR-DN", label: "Debit Notes" },
+]
+
+function rowDocumentType(row: ReconciliationRow): DocumentType {
+  return row.documentType ?? "B2B"
+}
+
 export default function RequestDetailPage() {
   const { isAuthenticated, displayName } = useAuth()
   const params = useParams()
@@ -46,6 +66,7 @@ export default function RequestDetailPage() {
   const [summary, setSummary] = useState<ReconciliationSummary | null>(null)
   const [activeFilters, setActiveFilters] = useState<ReconciliationFilterId[]>([])
   const [activeUrgencies, setActiveUrgencies] = useState<ActionUrgency[]>([])
+  const [docTypeTab, setDocTypeTab] = useState<DocTypeTab>("all")
   const [exportBusy, setExportBusy] = useState(false)
   const [navigating, setNavigating] = useState(false)
 
@@ -89,17 +110,20 @@ export default function RequestDetailPage() {
   }
 
   const filtered = useMemo(() => {
-    return results.filter((row) =>
-      (activeFilters.length === 0 ||
-        activeFilters.some((filter) => {
-          if (filter === "DeadlineWarning") return row.isDeadlineWarning && !row.isDeadlineExpired
-          if (filter === "PosIssues") return row.isPOSMismatch
-          if (filter === "All") return true
-          return row.status === filter
-        })) &&
-      (activeUrgencies.length === 0 || activeUrgencies.includes(row.actionUrgency)),
-    )
-  }, [activeFilters, activeUrgencies, results])
+    return results.filter((row) => {
+      if (docTypeTab !== "all" && rowDocumentType(row) !== docTypeTab) return false
+      return (
+        (activeFilters.length === 0 ||
+          activeFilters.some((filter) => {
+            if (filter === "DeadlineWarning") return row.isDeadlineWarning && !row.isDeadlineExpired
+            if (filter === "PosIssues") return row.isPOSMismatch
+            if (filter === "All") return true
+            return row.status === filter
+          })) &&
+        (activeUrgencies.length === 0 || activeUrgencies.includes(row.actionUrgency))
+      )
+    })
+  }, [activeFilters, activeUrgencies, docTypeTab, results])
 
   const gstr3bSummary = useMemo(() => calculateGSTR3BSummary(results), [results])
 
@@ -287,6 +311,25 @@ export default function RequestDetailPage() {
         ) : null}
 
         <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <div className="mb-3 flex flex-wrap gap-2 border-b border-border pb-3">
+            {DOC_TYPE_TABS.map((t) => (
+              <Button
+                key={t.id}
+                type="button"
+                variant={docTypeTab === t.id ? "default" : "outline"}
+                size="sm"
+                className={cn(
+                  "h-8 rounded-full px-3 text-xs font-medium",
+                  docTypeTab === t.id
+                    ? "bg-brand-blue text-white hover:bg-brand-blue/90"
+                    : "border-border bg-white text-brand-navy hover:bg-slate-50",
+                )}
+                onClick={() => setDocTypeTab(t.id)}
+              >
+                {t.label}
+              </Button>
+            ))}
+          </div>
           <ReconciliationTable
             rows={filtered}
             loading={false}

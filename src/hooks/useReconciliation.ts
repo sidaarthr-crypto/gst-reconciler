@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { parseGstr2bJson } from "@/lib/parseGstr2bJson"
 import {
   ParseError,
   detectPeriodMismatch,
@@ -219,7 +220,9 @@ export function useReconciliation(
       setGstr2bFilePeriodMismatchDismissed(false)
       setGstr2bPeriodContinueAnyway(false)
       try {
-        const parsed = await parseGSTR2BFile(file)
+        const parsed = file.name.toLowerCase().endsWith(".json")
+          ? await parseGstr2bJson(file)
+          : await parseGSTR2BFile(file)
         if (parsed.rowCount > config.maxFileRows) {
           throw new ParseError(
             `This file has ${parsed.rowCount} rows, which is more than the maximum of ${config.maxFileRows} rows allowed per upload. Please split the file or filter the export.`,

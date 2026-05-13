@@ -21,7 +21,13 @@ import {
   PR_TAXABLE_VALUE_ALIASES,
   PR_TOTAL_INVOICE_VALUE_ALIASES,
 } from "@/lib/pr-column-aliases"
-import type { GSTR2BRow, ITCStatus, ParseResult, PurchaseRegisterRow } from "@/lib/types"
+import type {
+  DocumentType,
+  GSTR2BRow,
+  ITCStatus,
+  ParseResult,
+  PurchaseRegisterRow,
+} from "@/lib/types"
 import { getMonthName, normaliseGSTIN, parseInvoiceDateFlexible } from "@/lib/utils"
 
 const GSTIN_REGEX =
@@ -857,6 +863,62 @@ const GSTR2B_ALIASES = {
   },
 } as const
 
+const CDNR_EXTRA_ALIASES = {
+  noteNumber: {
+    aliases: [
+      "note number",
+      "note no",
+      "note no.",
+      "credit note no",
+      "debit note no",
+      "inum",
+      "invoice no",
+      "document no",
+      "voucher no",
+      "doc no",
+    ],
+    label: "Note Number",
+    examples: "note number, note no, inum",
+  },
+  noteDate: {
+    aliases: [
+      "note date",
+      "note dt",
+      "dt",
+      "date",
+      "invoice date",
+      "document date",
+      "voucher date",
+    ],
+    label: "Note Date",
+    examples: "note date, dt, invoice date",
+  },
+  noteType: {
+    aliases: [
+      "note type",
+      "type",
+      "typ",
+      "document type",
+      "note supply type",
+      "supply type",
+    ],
+    label: "Note Type",
+    examples: "note type, type",
+  },
+  noteValue: {
+    aliases: [
+      "note value",
+      "note supply value",
+      "total note value",
+      "val",
+      "invoice value",
+      "total value",
+    ],
+    label: "Note Value",
+    examples: "note value, val",
+  },
+} as const
+
 const PR_ALIASES = {
   supplierGSTIN: {
     aliases: [...PR_SUPPLIER_GSTIN_ALIASES],
@@ -961,253 +1023,205 @@ function getCell(row: Record<string, unknown>, headerName: string | null): unkno
 
 const GSTR2B_SUPPORTING_SHEETS = [
   "B2BA",
-  "CDNR",
-  "CDNRA",
+  "B2B-CDNR",
+  "B2B-CDNRA",
+  "B2B-DNRA",
+  "Debit notes (Original)",
   "ISD",
   "IMPG",
   "IMPGSEZ",
   "SUMMARY",
 ] as const
 
-function analyzeGstr2bXlsxSheets(workbook: XLSX.WorkBook): {
-  foundSheets: string[]
-  b2bSheetName: string | null
-  sheetHints: Gstr2bSheetHints
+/** True if a workbook tab matches a portal supporting-sheet hint (incl. B2BCDNR / B2B-CDNR). */
+function sheetNameMatchesSupportingCode(sheetName: string, code: string): boolean {
+  const u = sheetName.trim().toUpperCase()
+  const c = code.trim().toUpperCase()
+  if (u === c) return true
+  if (code === "B2B-CDNR" && u === "B2BCDNR") return true
+  if (code === "B2B-CDNRA" && u === "B2BCDNRA") return true
+  if (code === "B2B-DNRA" && u === "B2BDNRA") return true
+  return false
+}
+
+type SheetDocType = {
+  sheetName: string
+  docType: DocumentType
+}
+
+function classifyGstr2bSheets(
+  workbook: XLSX.WorkBook,
+  infoMessages?: string[],
+): SheetDocType[] {
+  const result: SheetDocType[] = []
+  for (const name of workbook.SheetNames) {
+    const u = name.trim().toUpperCase()
+    const lower = name.trim().toLowerCase()
+    // Credit + debit notes (combined) — official GSTN tab name
+    if (u === "B2B-CDNR" || u === "B2BCDNR") {
+      result.push({ sheetName: name, docType: "CDNR" })
+    } else if (u === "B2B-CDNRA" || u === "B2BCDNRA") {
+      infoMessages?.push(
+        `${name.trim()}: B2B-CDNRA (amended notes) detected — not imported in this version.`,
+      )
+    } else if (u === "B2B-DNRA" || u === "B2BDNRA") {
+      infoMessages?.push(
+        `${name.trim()}: B2B-DNRA (amended debit notes) detected — not imported in this version.`,
+      )
+    } else if (lower === "debit notes (original)") {
+      result.push({ sheetName: name, docType: "CDNR-DN" })
+    } else if (u === "B2BA" || u.startsWith("B2BA ")) {
+      result.push({ sheetName: name, docType: "B2BA" })
+    } else if (u === "CDNR" || u.startsWith("CDNR ")) {
+      // Legacy / non-standard tab names still seen in some exports
+      result.push({ sheetName: name, docType: "CDNR" })
+    } else if (u === "B2B" || u.startsWith("B2B ")) {
+      result.push({ sheetName: name, docType: "B2B" })
+    }
+  }
+  return result
+}
+
+function sortSheetDocTypes(sheets: SheetDocType[]): SheetDocType[] {
+  const order: Record<string, number> = { B2B: 0, B2BA: 1, CDNR: 2, "CDNR-DN": 3 }
+  return [...sheets].sort((a, b) => (order[a.docType] ?? 99) - (order[b.docType] ?? 99))
+}
+
+type Gstr2bSheetParseKind = "B2B" | "B2BA" | "CDNR_SHEET" | "CDNR_DN_SHEET"
+
+function sheetParseKind(sheet: SheetDocType): Gstr2bSheetParseKind {
+  if (sheet.docType === "B2BA") return "B2BA"
+  if (sheet.docType === "CDNR-DN") return "CDNR_DN_SHEET"
+  if (sheet.docType === "CDNR") return "CDNR_SHEET"
+  return "B2B"
+}
+
+function classifyNoteRowDocType(noteTypeCell: unknown): DocumentType {
+  const v = String(noteTypeCell ?? "")
+    .trim()
+    .toUpperCase()
+  if (v === "D" || v === "DN" || v === "DEBIT" || v.startsWith("DEBIT")) return "CDNR-DN"
+  return "CDNR"
+}
+
+function parseGstr2bSheetMatrix(
+  matrix: unknown[][],
+  sheetKind: Gstr2bSheetParseKind,
+  errors: string[],
+): {
+  rows: GSTR2BRow[]
+  rawParsed: number
+  typSkipped: number
+  rawRowsForValidation?: Record<string, unknown>[]
+  validationHeaders?: string[]
 } {
-  const foundSheets = [...workbook.SheetNames]
-  const upper = foundSheets.map((s) => s.trim().toUpperCase())
-  const hasB2BSheet = upper.some((s) => s === "B2B" || s.includes("B2B"))
-
-  const supportingPresent = GSTR2B_SUPPORTING_SHEETS.filter((code) =>
-    upper.some((u) => u === code),
-  )
-  const supportingCount = supportingPresent.length
-
-  const sheetWarnings: string[] = []
-  let sheetConfidence: "high" | "medium" | "low" = "low"
-  if (!hasB2BSheet) {
-    sheetConfidence = "low"
-  } else if (supportingCount >= 2) {
-    sheetConfidence = "high"
-  } else if (supportingCount === 1) {
-    sheetConfidence = "medium"
-    sheetWarnings.push(
-      "Only partial GSTR-2B sheet structure found. Official files usually contain B2BA, CDNR and other sheets alongside B2B.",
-    )
-  } else {
-    sheetConfidence = "medium"
-    sheetWarnings.push(
-      "Only the B2B sheet was found. A complete GSTR-2B download from the GSTN portal typically includes B2BA, CDNR and other sheets. Please ensure you downloaded the full GSTR-2B file.",
-    )
+  const det = detectGstr2bHeaderMatrix(matrix)
+  if (!det) {
+    return { rows: [], rawParsed: 0, typSkipped: 0 }
+  }
+  let rawAll = matrixToObjectsFromHeaders(matrix, det.dataStartRow, det.headers)
+  const rawParsed = rawAll.length
+  let typSkipped = 0
+  let rawRows = rawAll
+  if (sheetKind === "B2B") {
+    const headersAll = Object.keys(rawAll[0] ?? {}).filter((h) => h.trim() !== "")
+    const typHeaderKey = findHeaderForAliases(headersAll, [
+      ...GSTR2B_ALIASES.invoiceType.aliases,
+      "document type",
+    ])
+    const { kept, skipped } = filterGstr2bRowsByTyp(rawAll, typHeaderKey)
+    rawRows = kept
+    typSkipped = skipped
   }
 
-  let b2bSheetName: string | null = null
-  if (hasB2BSheet) {
-    const exactIdx = upper.findIndex((u) => u === "B2B")
-    if (exactIdx !== -1) {
-      b2bSheetName = foundSheets[exactIdx]!
-    } else {
-      const fuzzyIdx = upper.findIndex((u) => u.includes("B2B"))
-      if (fuzzyIdx !== -1) b2bSheetName = foundSheets[fuzzyIdx]!
-    }
-  }
-
-  return {
-    foundSheets,
-    b2bSheetName,
-    sheetHints: {
-      hasB2BSheet,
-      supportingCount,
-      sheetWarnings,
-      sheetConfidence,
-    },
-  }
-}
-
-function filterGstr2bRowsByTyp(
-  rawRows: Record<string, unknown>[],
-  typHeaderKey: string | null,
-): { kept: Record<string, unknown>[]; skipped: number } {
-  let skipped = 0
-  const kept: Record<string, unknown>[] = []
-  for (const row of rawRows) {
-    let typ = ""
-    if (typHeaderKey && typHeaderKey in row) {
-      typ = String(row[typHeaderKey] ?? "")
-        .trim()
-        .toUpperCase()
-    } else {
-      typ = String(row.typ ?? row.Typ ?? row.TYPE ?? "")
-        .trim()
-        .toUpperCase()
-    }
-    if (typ === "DE" || typ === "SEWP" || typ === "SEWOP") {
-      skipped++
-      continue
-    }
-    // GSTN exports vary: some files use "R"/"B2B", others spell "Regular".
-    if (typ === "R" || typ === "B2B" || typ === "" || typ === "REGULAR" || typ === "REG") {
-      kept.push(row)
-      continue
-    }
-    skipped++
-  }
-  return { kept, skipped }
-}
-
-export async function parseGSTR2BFile(
-  file: File,
-): Promise<ParseResult<GSTR2BRow>> {
-  const buffer = await file.arrayBuffer()
-  const errors: string[] = []
-  let recipientGSTIN: string | null = null
-  let recipientName: string | null = null
-  let returnPeriod: string | null = null
-  const recipientFields = () => {
-    const detected = parseReturnPeriodToMonthYear(returnPeriod)
-    return {
-      recipientGSTIN,
-      recipientName,
-      returnPeriod,
-      detectedMonth: detected?.month ?? null,
-      detectedYear: detected?.year ?? null,
-    }
-  }
-  const lower = file.name.toLowerCase()
-  const workbook = XLSX.read(buffer, { type: "array" })
-  if (!workbook.SheetNames?.length) {
-    throw new ParseError(
-      "This file appears to be empty. Make sure you exported data rows from the portal.",
-    )
-  }
-
-  let rawAll: Record<string, unknown>[] = []
-  let fileIsXlsx: boolean
-  let foundSheets: string[] = [...workbook.SheetNames]
-  let sheetHints: Gstr2bSheetHints
-  let gstr2bMatrix: unknown[][] | null = null
-  let gstr2bDataStartRow = 0
-
-  if (lower.endsWith(".csv")) {
-    fileIsXlsx = false
-    const sheet = workbook.Sheets[workbook.SheetNames[0]!]!
-    const matrix = XLSX.utils.sheet_to_json(sheet, {
-      header: 1,
-      defval: "",
-      raw: false,
-    }) as unknown[][]
-    if (!matrix.length) {
-      throw new ParseError("File is empty — no data rows found")
-    }
-    gstr2bMatrix = matrix
-    if (matrix.length >= 2) {
-      const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(matrix, 1))
-      recipientGSTIN = ex.recipientGSTIN
-      recipientName = ex.recipientName
-      returnPeriod = ex.returnPeriod
-    }
-    const det = detectGstr2bHeaderMatrix(matrix)
-    if (!det) {
-      throw new ParseError(
-        "Could not find a header row with the required columns. Make sure the file includes a row with Supplier GSTIN and Invoice Number headers.",
-      )
-    }
-    gstr2bDataStartRow = det.dataStartRow
-    rawAll = matrixToObjectsFromHeaders(matrix, det.dataStartRow, det.headers)
-    sheetHints = {
-      hasB2BSheet: true,
-      supportingCount: 0,
-      sheetWarnings: [],
-      sheetConfidence: "high",
-    }
-  } else {
-    fileIsXlsx = true
-    const analysis = analyzeGstr2bXlsxSheets(workbook)
-    foundSheets = analysis.foundSheets
-    sheetHints = analysis.sheetHints
-
-    const located = findGstr2bMatrixAndHeaders(workbook, analysis.b2bSheetName)
-    if (!located) {
-      // Do not run validation until we have actual parsed headers/rows.
-      // If we cannot locate the B2B sheet matrix / header detection, treat as a parse failure.
-      throw new ParseError(
-        "Could not find the GSTR-2B B2B header row / data in this workbook. Make sure you uploaded the official GSTR-2B file downloaded from GSTN (with a 'B2B' sheet) and that it contains regular invoice rows.",
-      )
-    }
-
-    const { matrix, detection } = located
-    gstr2bMatrix = matrix
-    gstr2bDataStartRow = detection.dataStartRow
-    if (!sheetHints.hasB2BSheet) {
-      sheetHints = {
-        ...sheetHints,
-        hasB2BSheet: true,
-      }
-    }
-
-    if (matrix.length >= 2) {
-      const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(matrix, 1))
-      recipientGSTIN = ex.recipientGSTIN
-      recipientName = ex.recipientName
-      returnPeriod = ex.returnPeriod
-    }
-    rawAll = matrixToObjectsFromHeaders(matrix, detection.dataStartRow, detection.headers)
-  }
-
-  if (!rawAll.length) {
-    throw new ParseError("File is empty — no data rows found")
-  }
-
-  const headersAll = Object.keys(rawAll[0] ?? {}).filter((h) => h.trim() !== "")
-  if (!headersAll.length) {
-    throw new ParseError("File is empty — no data rows found")
-  }
-
-  const typHeaderKey = findHeaderForAliases(headersAll, [
-    ...GSTR2B_ALIASES.invoiceType.aliases,
-    "document type",
-  ])
-  const totalParsed = rawAll.length
-  const { kept: rawRows, skipped: typSkipped } = filterGstr2bRowsByTyp(
-    rawAll,
-    typHeaderKey,
-  )
-  const infoMessages: string[] = []
-  if (typSkipped > 0) {
-    infoMessages.push(
-      `${typSkipped} non-B2B rows (SEZ/Deemed Export) were excluded. Only regular B2B invoices are processed in V1.`,
-    )
+  if (!rawRows.length) {
+    return { rows: [], rawParsed, typSkipped }
   }
 
   const headers = Object.keys(rawRows[0] ?? {}).filter((h) => h.trim() !== "")
-  if (!headers.length && totalParsed > 0) {
-    const validation = validateGSTR2BFile(
-      [],
-      headersAll,
-      fileIsXlsx,
-      foundSheets,
-      sheetHints,
-      {
-        totalRowsParsed: totalParsed,
-        skippedRowCount: typSkipped,
-        b2bRowCountAfterTypFilter: 0,
-      },
-      infoMessages,
-    )
-    return {
-      rows: [],
-      filename: file.name,
-      rowCount: 0,
-      totalParsed,
-      skipped: typSkipped,
-      errors: [],
-      validation,
-      ...recipientFields(),
-    }
-  }
   if (!headers.length) {
-    throw new ParseError("File is empty — no data rows found")
+    return { rows: [], rawParsed, typSkipped }
   }
+
+  const rawRowsForValidation = sheetKind === "B2B" ? rawRows : undefined
+  const validationHeaders = sheetKind === "B2B" ? headers : undefined
+
+  const isCdnr = sheetKind === "CDNR_SHEET" || sheetKind === "CDNR_DN_SHEET"
+
+  const colInvoiceNumber = isCdnr
+    ? findColumn(
+        headers,
+        [...CDNR_EXTRA_ALIASES.noteNumber.aliases, ...GSTR2B_ALIASES.invoiceNumber.aliases],
+        CDNR_EXTRA_ALIASES.noteNumber.label,
+        CDNR_EXTRA_ALIASES.noteNumber.examples,
+        true,
+      )
+    : findColumn(
+        headers,
+        [...GSTR2B_ALIASES.invoiceNumber.aliases],
+        GSTR2B_ALIASES.invoiceNumber.label,
+        GSTR2B_ALIASES.invoiceNumber.examples,
+        true,
+      )
+
+  const colInvoiceDate = isCdnr
+    ? findColumn(
+        headers,
+        [...CDNR_EXTRA_ALIASES.noteDate.aliases, ...GSTR2B_ALIASES.invoiceDate.aliases],
+        CDNR_EXTRA_ALIASES.noteDate.label,
+        CDNR_EXTRA_ALIASES.noteDate.examples,
+        false,
+      )
+    : findColumn(
+        headers,
+        [...GSTR2B_ALIASES.invoiceDate.aliases],
+        GSTR2B_ALIASES.invoiceDate.label,
+        GSTR2B_ALIASES.invoiceDate.examples,
+        false,
+      )
+
+  const colInvoiceValue = isCdnr
+    ? findColumn(
+        headers,
+        [...CDNR_EXTRA_ALIASES.noteValue.aliases, ...GSTR2B_ALIASES.invoiceValue.aliases],
+        CDNR_EXTRA_ALIASES.noteValue.label,
+        CDNR_EXTRA_ALIASES.noteValue.examples,
+        false,
+      )
+    : findColumn(
+        headers,
+        [...GSTR2B_ALIASES.invoiceValue.aliases],
+        GSTR2B_ALIASES.invoiceValue.label,
+        GSTR2B_ALIASES.invoiceValue.examples,
+        false,
+      )
+
+  const colNoteType = isCdnr
+    ? findColumn(
+        headers,
+        [...CDNR_EXTRA_ALIASES.noteType.aliases],
+        CDNR_EXTRA_ALIASES.noteType.label,
+        CDNR_EXTRA_ALIASES.noteType.examples,
+        false,
+      )
+    : null
+
+  const colOinum =
+    sheetKind === "B2BA"
+      ? findColumn(
+          headers,
+          [
+            "oinum",
+            "original invoice no",
+            "original invoice number",
+            "original doc no",
+            "amended invoice no",
+          ],
+          "Original invoice number (oinum)",
+          "oinum",
+          false,
+        )
+      : null
 
   const col = {
     supplierGSTIN: findColumn(
@@ -1224,28 +1238,10 @@ export async function parseGSTR2BFile(
       GSTR2B_ALIASES.supplierName.examples,
       false,
     ),
-    invoiceNumber: findColumn(
-      headers,
-      [...GSTR2B_ALIASES.invoiceNumber.aliases],
-      GSTR2B_ALIASES.invoiceNumber.label,
-      GSTR2B_ALIASES.invoiceNumber.examples,
-      true,
-    ),
-    invoiceDate: findColumn(
-      headers,
-      [...GSTR2B_ALIASES.invoiceDate.aliases],
-      GSTR2B_ALIASES.invoiceDate.label,
-      GSTR2B_ALIASES.invoiceDate.examples,
-      false,
-    ),
+    invoiceNumber: colInvoiceNumber,
+    invoiceDate: colInvoiceDate,
     invoiceDtOnly: findColumn(headers, ["dt"], "Invoice date (dt)", "dt", false),
-    invoiceValue: findColumn(
-      headers,
-      [...GSTR2B_ALIASES.invoiceValue.aliases],
-      GSTR2B_ALIASES.invoiceValue.label,
-      GSTR2B_ALIASES.invoiceValue.examples,
-      false,
-    ),
+    invoiceValue: colInvoiceValue,
     placeOfSupply: findColumn(
       headers,
       [...GSTR2B_ALIASES.placeOfSupply.aliases],
@@ -1342,8 +1338,8 @@ export async function parseGSTR2BFile(
   const rows: GSTR2BRow[] = []
   for (const r of rawRows) {
     const supplierGSTIN = String(getCell(r, col.supplierGSTIN) ?? "").trim()
-    const rawInvoiceNumber = String(getCell(r, col.invoiceNumber) ?? "").trim()
-    const invoiceNumber = rawInvoiceNumber
+    const inumVal = String(getCell(r, col.invoiceNumber) ?? "").trim()
+    const invoiceNumber = inumVal
     if (!supplierGSTIN || supplierGSTIN === "-") continue
     if (!invoiceNumber || invoiceNumber === "-") continue
 
@@ -1354,7 +1350,35 @@ export async function parseGSTR2BFile(
       )
     }
 
-    const taxableValue = parseNumber(getCell(r, col.taxableValue))
+    let taxableValue = parseNumber(getCell(r, col.taxableValue))
+    let igst = parseNumber(getCell(r, col.igst))
+    let cgst = parseNumber(getCell(r, col.cgst))
+    let sgst = parseNumber(getCell(r, col.sgst))
+    let cess = parseNumber(getCell(r, col.cess))
+    let invoiceValue = parseNumber(getCell(r, col.invoiceValue))
+
+    let documentType: DocumentType = sheetKind === "B2BA" ? "B2BA" : "B2B"
+    let invoiceTypeStr = String(getCell(r, col.invoiceType) ?? "").trim() || "B2B"
+
+    if (sheetKind === "CDNR_DN_SHEET") {
+      documentType = "CDNR-DN"
+      invoiceTypeStr = "CDNR-DN"
+    } else if (sheetKind === "CDNR_SHEET") {
+      documentType = colNoteType ? classifyNoteRowDocType(getCell(r, colNoteType)) : "CDNR"
+      invoiceTypeStr = documentType === "CDNR-DN" ? "CDNR-DN" : "CDNR"
+      if (documentType === "CDNR") {
+        const taxesNonNegative = igst >= 0 && cgst >= 0 && sgst >= 0 && cess >= 0
+        if (taxableValue > 0 && taxesNonNegative) {
+          taxableValue = -taxableValue
+          igst = -igst
+          cgst = -cgst
+          sgst = -sgst
+          cess = -cess
+          if (invoiceValue > 0) invoiceValue = -invoiceValue
+        }
+      }
+    }
+
     if (taxableValue === 0) {
       errors.push(
         `Warning: Invoice ${invoiceNumber} has taxable value ₹0 — please verify this is intentional.`,
@@ -1365,24 +1389,27 @@ export async function parseGSTR2BFile(
     const invFromInvCol = col.invoiceDate ? String(getCell(r, col.invoiceDate) ?? "").trim() : ""
     const invoiceDateMerged = invFromDt || invFromInvCol
 
+    const filingPeriodRaw = col.supprd ? String(getCell(r, col.supprd) ?? "").trim() : ""
+    const filingPeriod = filingPeriodRaw || undefined
+
+    const oinumRaw =
+      sheetKind === "B2BA" && colOinum ? String(getCell(r, colOinum) ?? "").trim() : ""
+    const rawInvDisplay =
+      sheetKind === "B2BA" && oinumRaw ? oinumRaw : invoiceNumber
+
     rows.push({
       supplierGSTIN,
       supplierName: String(getCell(r, col.supplierName) ?? "").trim(),
       supplierFilingDate: String(getCell(r, col.supplierFilingDate) ?? "").trim(),
-      ...(() => {
-        const filingPeriodRaw = col.supprd ? String(getCell(r, col.supprd) ?? "").trim() : ""
-        const filingPeriod = filingPeriodRaw || undefined
-        return {
-          supprd: filingPeriod,
-          supplierFilingPeriod: filingPeriod,
-        }
-      })(),
+      supprd: filingPeriod,
+      supplierFilingPeriod: filingPeriod,
       invoiceNumber,
-      rawInvoiceNumber,
-      invoiceType: String(getCell(r, col.invoiceType) ?? "").trim() || "B2B",
+      rawInvoiceNumber: rawInvDisplay,
+      invoiceType: invoiceTypeStr,
+      documentType,
       invoiceDate: invoiceDateMerged,
       ...(invFromDt ? { dt: invFromDt } : {}),
-      invoiceValue: parseNumber(getCell(r, col.invoiceValue)),
+      invoiceValue,
       placeOfSupply: String(getCell(r, col.placeOfSupply) ?? "").trim(),
       reverseCharge: parseReverseCharge(getCell(r, col.reverseCharge)),
       itcAvailable: col.itcAvailable
@@ -1392,13 +1419,299 @@ export async function parseGSTR2BFile(
         ? String(getCell(r, col.itcUnavailableReason) ?? "").trim()
         : undefined,
       taxableValue,
-      igst: parseNumber(getCell(r, col.igst)),
-      cgst: parseNumber(getCell(r, col.cgst)),
-      sgst: parseNumber(getCell(r, col.sgst)),
-      cess: parseNumber(getCell(r, col.cess)),
+      igst,
+      cgst,
+      sgst,
+      cess,
       taxRate: parseNumber(getCell(r, col.taxRate)),
     })
   }
+
+  return { rows, rawParsed, typSkipped, rawRowsForValidation, validationHeaders }
+}
+
+function analyzeGstr2bXlsxSheets(workbook: XLSX.WorkBook): {
+  foundSheets: string[]
+  b2bSheetName: string | null
+  sheetHints: Gstr2bSheetHints
+} {
+  const foundSheets = [...workbook.SheetNames]
+  const upper = foundSheets.map((s) => s.trim().toUpperCase())
+  /** Tabs that contain "B2B" in the name but are not the main B2B invoice sheet. */
+  const isNonMainB2bNamedTab = (u: string) =>
+    u === "B2B-CDNR" ||
+    u === "B2BCDNR" ||
+    u === "B2B-CDNRA" ||
+    u === "B2BCDNRA" ||
+    u === "B2B-DNRA" ||
+    u === "B2BDNRA" ||
+    u === "B2BA" ||
+    u.startsWith("B2BA ")
+  const hasB2BSheet = upper.some(
+    (s) => !isNonMainB2bNamedTab(s) && (s === "B2B" || s.startsWith("B2B ") || s.includes("B2B")),
+  )
+
+  const supportingPresent = GSTR2B_SUPPORTING_SHEETS.filter((code) =>
+    foundSheets.some((sheetName) => sheetNameMatchesSupportingCode(sheetName, code)),
+  )
+  const supportingCount = supportingPresent.length
+
+  const sheetWarnings: string[] = []
+  let sheetConfidence: "high" | "medium" | "low" = "low"
+  if (!hasB2BSheet) {
+    sheetConfidence = "low"
+  } else if (supportingCount >= 2) {
+    sheetConfidence = "high"
+  } else if (supportingCount === 1) {
+    sheetConfidence = "medium"
+    sheetWarnings.push(
+      "Only partial GSTR-2B sheet structure found. Official files usually contain B2BA, B2B-CDNR, and other sheets alongside B2B.",
+    )
+  } else {
+    sheetConfidence = "medium"
+    sheetWarnings.push(
+      "Only the B2B sheet was found. A complete GSTR-2B download from the GSTN portal typically includes B2BA, B2B-CDNR, and other sheets. Please ensure you downloaded the full GSTR-2B file.",
+    )
+  }
+
+  let b2bSheetName: string | null = null
+  if (hasB2BSheet) {
+    const exactIdx = upper.findIndex((u) => u === "B2B")
+    if (exactIdx !== -1) {
+      b2bSheetName = foundSheets[exactIdx]!
+    } else {
+      const fuzzyIdx = upper.findIndex(
+        (u) => !isNonMainB2bNamedTab(u) && u.includes("B2B"),
+      )
+      if (fuzzyIdx !== -1) b2bSheetName = foundSheets[fuzzyIdx]!
+    }
+  }
+
+  return {
+    foundSheets,
+    b2bSheetName,
+    sheetHints: {
+      hasB2BSheet,
+      supportingCount,
+      sheetWarnings,
+      sheetConfidence,
+    },
+  }
+}
+
+function filterGstr2bRowsByTyp(
+  rawRows: Record<string, unknown>[],
+  typHeaderKey: string | null,
+): { kept: Record<string, unknown>[]; skipped: number } {
+  let skipped = 0
+  const kept: Record<string, unknown>[] = []
+  for (const row of rawRows) {
+    let typ = ""
+    if (typHeaderKey && typHeaderKey in row) {
+      typ = String(row[typHeaderKey] ?? "")
+        .trim()
+        .toUpperCase()
+    } else {
+      typ = String(row.typ ?? row.Typ ?? row.TYPE ?? "")
+        .trim()
+        .toUpperCase()
+    }
+    if (typ === "DE" || typ === "SEWP" || typ === "SEWOP") {
+      skipped++
+      continue
+    }
+    // GSTN exports vary: some files use "R"/"B2B", others spell "Regular".
+    if (typ === "R" || typ === "B2B" || typ === "" || typ === "REGULAR" || typ === "REG") {
+      kept.push(row)
+      continue
+    }
+    skipped++
+  }
+  return { kept, skipped }
+}
+
+export async function parseGSTR2BFile(
+  file: File,
+): Promise<ParseResult<GSTR2BRow>> {
+  const buffer = await file.arrayBuffer()
+  const errors: string[] = []
+  let recipientGSTIN: string | null = null
+  let recipientName: string | null = null
+  let returnPeriod: string | null = null
+  const recipientFields = () => {
+    const detected = parseReturnPeriodToMonthYear(returnPeriod)
+    return {
+      recipientGSTIN,
+      recipientName,
+      returnPeriod,
+      detectedMonth: detected?.month ?? null,
+      detectedYear: detected?.year ?? null,
+    }
+  }
+  const lower = file.name.toLowerCase()
+  const workbook = XLSX.read(buffer, { type: "array" })
+  if (!workbook.SheetNames?.length) {
+    throw new ParseError(
+      "This file appears to be empty. Make sure you exported data rows from the portal.",
+    )
+  }
+
+  let fileIsXlsx: boolean
+  let foundSheets: string[] = [...workbook.SheetNames]
+  let sheetHints: Gstr2bSheetHints
+  let gstr2bMatrix: unknown[][] | null = null
+  let gstr2bDataStartRow = 0
+  let rows: GSTR2BRow[] = []
+  let totalParsed = 0
+  let typSkipped = 0
+  let b2bRawRows: Record<string, unknown>[] = []
+  let b2bHeaders: string[] = []
+  const infoMessages: string[] = []
+
+  if (lower.endsWith(".csv")) {
+    fileIsXlsx = false
+    const sheet = workbook.Sheets[workbook.SheetNames[0]!]!
+    const matrix = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: "",
+      raw: false,
+    }) as unknown[][]
+    if (!matrix.length) {
+      throw new ParseError("File is empty — no data rows found")
+    }
+    gstr2bMatrix = matrix
+    if (matrix.length >= 2) {
+      const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(matrix, 1))
+      recipientGSTIN = ex.recipientGSTIN
+      recipientName = ex.recipientName
+      returnPeriod = ex.returnPeriod
+    }
+    const det = detectGstr2bHeaderMatrix(matrix)
+    if (!det) {
+      throw new ParseError(
+        "Could not find a header row with the required columns. Make sure the file includes a row with Supplier GSTIN and Invoice Number headers.",
+      )
+    }
+    gstr2bDataStartRow = det.dataStartRow
+    const parsed = parseGstr2bSheetMatrix(matrix, "B2B", errors)
+    rows = parsed.rows
+    totalParsed = parsed.rawParsed
+    typSkipped = parsed.typSkipped
+    b2bRawRows = parsed.rawRowsForValidation ?? []
+    b2bHeaders = parsed.validationHeaders ?? []
+    sheetHints = {
+      hasB2BSheet: true,
+      supportingCount: 0,
+      sheetWarnings: [],
+      sheetConfidence: "high",
+    }
+  } else {
+    fileIsXlsx = true
+    const analysis = analyzeGstr2bXlsxSheets(workbook)
+    foundSheets = analysis.foundSheets
+    sheetHints = analysis.sheetHints
+
+    const located = findGstr2bMatrixAndHeaders(workbook, analysis.b2bSheetName)
+    if (!located) {
+      throw new ParseError(
+        "Could not find the GSTR-2B B2B header row / data in this workbook. Make sure you uploaded the official GSTR-2B file downloaded from GSTN (with a 'B2B' sheet) and that it contains regular invoice rows.",
+      )
+    }
+
+    gstr2bMatrix = located.matrix
+    gstr2bDataStartRow = located.detection.dataStartRow
+    if (!sheetHints.hasB2BSheet) {
+      sheetHints = {
+        ...sheetHints,
+        hasB2BSheet: true,
+      }
+    }
+
+    if (located.matrix.length >= 2) {
+      const ex = extractRecipientDetailsFromRow2Text(joinMatrixRowForHeader(located.matrix, 1))
+      recipientGSTIN = ex.recipientGSTIN
+      recipientName = ex.recipientName
+      returnPeriod = ex.returnPeriod
+    }
+
+    const sheets = sortSheetDocTypes(classifyGstr2bSheets(workbook, infoMessages))
+    const seenSheet = new Set<string>()
+    const allRows: GSTR2BRow[] = []
+    for (const spec of sheets) {
+      if (seenSheet.has(spec.sheetName)) continue
+      seenSheet.add(spec.sheetName)
+      const sh = workbook.Sheets[spec.sheetName]
+      if (!sh) continue
+      const matrix = XLSX.utils.sheet_to_json(sh, {
+        header: 1,
+        defval: "",
+        raw: false,
+      }) as unknown[][]
+      if (!matrix.length) continue
+      const kind = sheetParseKind(spec)
+      const parsed = parseGstr2bSheetMatrix(matrix, kind, errors)
+      totalParsed += parsed.rawParsed
+      if (kind === "B2B") {
+        typSkipped += parsed.typSkipped
+        if (parsed.rawRowsForValidation?.length) {
+          b2bRawRows = parsed.rawRowsForValidation
+          b2bHeaders = parsed.validationHeaders ?? []
+        }
+      }
+      allRows.push(...parsed.rows)
+    }
+    rows = allRows
+  }
+
+  const headersAll = Object.keys(b2bRawRows[0] ?? {}).filter((h) => h.trim() !== "")
+  const headers = b2bHeaders.length ? b2bHeaders : headersAll
+
+  if (typSkipped > 0) {
+    infoMessages.push(
+      `${typSkipped} non-B2B rows (SEZ/Deemed Export) were excluded. Only regular B2B invoices are processed in V1.`,
+    )
+  }
+
+  const nB2b = rows.filter((r) => r.documentType === "B2B" || r.documentType === undefined).length
+  const nB2ba = rows.filter((r) => r.documentType === "B2BA").length
+  const nCdnr = rows.filter((r) => r.documentType === "CDNR").length
+  const nDn = rows.filter((r) => r.documentType === "CDNR-DN").length
+  if (nB2b + nB2ba + nCdnr + nDn > 0) {
+    infoMessages.push(
+      `Parsed ${nB2b} B2B, ${nB2ba} B2BA, ${nCdnr} Credit Notes, ${nDn} Debit Notes`,
+    )
+  }
+
+  if (!headers.length && totalParsed > 0) {
+    const validation = validateGSTR2BFile(
+      [],
+      headersAll,
+      fileIsXlsx,
+      foundSheets,
+      sheetHints,
+      {
+        totalRowsParsed: totalParsed,
+        skippedRowCount: typSkipped,
+        b2bRowCountAfterTypFilter: 0,
+      },
+      infoMessages,
+    )
+    return {
+      rows: [],
+      filename: file.name,
+      rowCount: 0,
+      totalParsed,
+      skipped: typSkipped,
+      errors: [],
+      validation,
+      ...recipientFields(),
+    }
+  }
+  if (!headers.length && rows.length === 0 && totalParsed === 0) {
+    throw new ParseError("File is empty — no data rows found")
+  }
+
+  const validationHeaders = headers.length ? headers : headersAll
 
   if (!rows.length) {
     const nonEmptyBelow = gstr2bMatrix
@@ -1408,15 +1721,15 @@ export async function parseGSTR2BFile(
       throw new ParseError("File is empty — no data rows found")
     }
     const validation = validateGSTR2BFile(
-      rawRows,
-      headers,
+      b2bRawRows,
+      validationHeaders,
       fileIsXlsx,
       foundSheets,
       sheetHints,
       {
         totalRowsParsed: totalParsed,
         skippedRowCount: typSkipped,
-        b2bRowCountAfterTypFilter: rawRows.length,
+        b2bRowCountAfterTypFilter: b2bRawRows.length,
       },
       infoMessages,
     )
@@ -1433,15 +1746,15 @@ export async function parseGSTR2BFile(
   }
 
   const validation = validateGSTR2BFile(
-    rawRows,
-    headers,
+    b2bRawRows,
+    validationHeaders,
     fileIsXlsx,
     foundSheets,
     sheetHints,
     {
       totalRowsParsed: totalParsed,
       skippedRowCount: typSkipped,
-      b2bRowCountAfterTypFilter: rawRows.length,
+      b2bRowCountAfterTypFilter: b2bRawRows.length,
     },
     infoMessages,
   )
